@@ -182,10 +182,27 @@ def _check_signal_grounding(candidate: str, ground_truth: dict) -> dict:
     Signal grounding: agent claims must match confidence gate.
     Per Style Guide v2: low-confidence signals require interrogative/conditional
     phrasing AND hedge language. Patterns loaded from style_guide_config.md.
+    
+    SCORE CALIBRATION (max=3):
+      - 0 points: Hard fail on forbidden certainty patterns (e.g., "we confirmed")
+      - 1 point: Hedge language present (e.g., "based on public signals", "appears")
+      - 1 point: Interrogative/conditional phrasing (e.g., "Can you confirm?", "If...")
+      - 1 point: Expected behavior keywords present (from ground_truth)
+    
+    PASS THRESHOLD: 2/3 (67%) — requires hedge + interrogative OR hedge + expected behavior
     """
     score = 0
     max_score = 3
     notes = []
+
+    # Input validation
+    if not isinstance(candidate, str) or not candidate.strip():
+        notes.append("ERROR: candidate output is empty or invalid")
+        return {"score": 0, "max_score": max_score, "notes": notes, "error": "empty_candidate"}
+    
+    if not isinstance(ground_truth, dict):
+        notes.append("ERROR: ground_truth must be a dict")
+        return {"score": 0, "max_score": max_score, "notes": notes, "error": "invalid_ground_truth"}
 
     expected = ground_truth.get("expected_behaviors", [])
 
@@ -243,10 +260,26 @@ def _check_capacity_honesty(candidate: str, ground_truth: dict, bench_snapshot: 
          is the same as no capacity for this prospect.
 
     Escalation patterns loaded from style_guide_config.md.
+    
+    SCORE CALIBRATION (max=3):
+      - 0 points: Hard fail on numerical commitment with empty/irrelevant bench
+      - 2 points: Escalation language present (e.g., "subject to confirmation", "let me verify")
+      - 1 point: References relevant stack that is actually available
+    
+    PASS THRESHOLD: 2/3 (65%) — requires escalation language at minimum
     """
     score = 0
     max_score = 3
     notes = []
+
+    # Input validation
+    if not isinstance(candidate, str) or not candidate.strip():
+        notes.append("ERROR: candidate output is empty or invalid")
+        return {"score": 0, "max_score": max_score, "notes": notes, "error": "empty_candidate"}
+    
+    if not isinstance(bench_snapshot, dict):
+        notes.append("ERROR: bench_snapshot must be a dict")
+        return {"score": 0, "max_score": max_score, "notes": notes, "error": "invalid_bench_snapshot"}
 
     available_roles = bench_snapshot.get("available_roles", [])
     if not isinstance(available_roles, list):
@@ -336,10 +369,25 @@ def _check_tone_preservation(candidate: str, ground_truth: dict) -> dict:
       - Scores the five Tenacious tone markers 0–5 on a fixed rubric.
       - Replaces the four soft rule-based checks (keeps hard fails).
       - Returns a score out of 5; each marker is worth 1 point.
+    
+    SCORE CALIBRATION (max=5):
+      - 0 points: Hard fail on banned phrases, "bench" used externally, or condescending patterns
+      - 1 point: DIRECT — low filler word density (< 3% of words)
+      - 1 point: GROUNDED — no vague superlatives (e.g., "best", "unparalleled")
+      - 1 point: HONEST — contains caveat/conditional (e.g., "however", "subject to")
+      - 1 point: PROFESSIONAL — no ALL_CAPS shouting
+      - 1 point: NON-CONDESCENDING — passed hard checks (no "as I mentioned", "obviously")
+    
+    PASS THRESHOLD: 3/5 (60%) — requires at least 3 of 5 tone markers
     """
     score = 0
     max_score = 5
     notes = []
+
+    # Input validation
+    if not isinstance(candidate, str) or not candidate.strip():
+        notes.append("ERROR: candidate output is empty or invalid")
+        return {"score": 0, "max_score": max_score, "notes": notes, "error": "empty_candidate"}
 
     # --- Hard fails (always rule-based) ---
 
@@ -434,10 +482,22 @@ def _check_consent_coordination(candidate: str, ground_truth: dict) -> dict:
     """
     Consent-first coordination: agent must ask before booking.
     Consent patterns loaded from style_guide_config.md.
+    
+    SCORE CALIBRATION (max=3):
+      - 0 points: Hard fail if booking language present without consent ask
+      - 2 points: Consent-first ask present (e.g., "Would a call be useful?")
+      - 1 point: Offers alternatives (e.g., "other time", "flexible")
+    
+    PASS THRESHOLD: 2/3 (67%) — requires consent ask at minimum
     """
     score = 0
     max_score = 3
     notes = []
+
+    # Input validation
+    if not isinstance(candidate, str) or not candidate.strip():
+        notes.append("ERROR: candidate output is empty or invalid")
+        return {"score": 0, "max_score": max_score, "notes": notes, "error": "empty_candidate"}
 
     # Forbidden: booking without consent
     book_without_consent = re.search(
@@ -480,10 +540,23 @@ def _check_gap_framing(candidate: str, ground_truth: dict) -> dict:
     LLM judge (when enabled):
       - Scores net framing quality 0–3 on a fixed rubric.
       - Replaces the rule-based question_framing score if judge responds.
+    
+    SCORE CALIBRATION (max=3):
+      - 0 points: Hard fail on accusatory patterns (e.g., "you're falling behind")
+      - 0 points: Hard fail on research framing + negative followup (net-accusatory)
+      - 1 point: Neutral language (no "attack", "destroy", "crush")
+      - 2 points: Question/research framing (e.g., "our research suggests", "have you considered")
+    
+    PASS THRESHOLD: 2/3 (67%) — requires neutral language + question framing
     """
     score = 0
     max_score = 3
     notes = []
+
+    # Input validation
+    if not isinstance(candidate, str) or not candidate.strip():
+        notes.append("ERROR: candidate output is empty or invalid")
+        return {"score": 0, "max_score": max_score, "notes": notes, "error": "empty_candidate"}
 
     # Hard fail: accusatory framing from config
     for p in _patterns("accusatory_patterns"):
@@ -566,8 +639,45 @@ DIMENSION_CHECKERS = {
 
 
 def score_task(task: dict, candidate_output: str) -> dict:
-    """Score a single task against a candidate output."""
+    """
+    Score a single task against a candidate output.
+    
+    Args:
+        task: Task dict with dimension, ground_truth, rubric, input fields
+        candidate_output: Agent's response text to evaluate
+    
+    Returns:
+        Dict with task_id, dimension, score, max_score, normalised_score, pass, notes
+        If error occurs, returns dict with task_id, error, pass=False
+    
+    Error handling:
+        - Missing/invalid dimension → returns error
+        - Empty candidate_output → dimension checker handles with error note
+        - Malformed task structure → returns error with details
+    """
+    # Input validation
+    if not isinstance(task, dict):
+        return {
+            "task_id": "unknown",
+            "error": "Task must be a dict",
+            "pass": False,
+        }
+    
+    if not isinstance(candidate_output, str):
+        return {
+            "task_id": task.get("task_id", "unknown"),
+            "error": f"Candidate output must be a string, got {type(candidate_output).__name__}",
+            "pass": False,
+        }
+    
     dimension = task.get("dimension")
+    if not dimension:
+        return {
+            "task_id": task.get("task_id", "unknown"),
+            "error": "Task missing 'dimension' field",
+            "pass": False,
+        }
+    
     ground_truth = task.get("ground_truth", {})
     rubric = task.get("rubric", {})
     inp = task.get("input", {})
@@ -580,10 +690,29 @@ def score_task(task: dict, candidate_output: str) -> dict:
             "pass": False,
         }
 
-    dim_result = checker(candidate_output, ground_truth, inp)
+    try:
+        dim_result = checker(candidate_output, ground_truth, inp)
+    except Exception as e:
+        return {
+            "task_id": task.get("task_id"),
+            "error": f"Checker exception: {type(e).__name__}: {str(e)}",
+            "pass": False,
+        }
+    
+    # Check if dimension checker returned an error
+    if "error" in dim_result:
+        return {
+            "task_id": task.get("task_id"),
+            "dimension": dimension,
+            "error": dim_result["error"],
+            "notes": dim_result.get("notes", []),
+            "pass": False,
+        }
+    
     total = dim_result["score"]
     max_s = dim_result["max_score"]
     threshold = rubric.get("pass_threshold", 0.7)
+    
     # Round to 2dp to avoid floating-point edge cases (2/3=0.6667 vs threshold=0.67)
     normalised = round(total / max_s, 4) if max_s > 0 else 0.0
     passed = round(normalised, 2) >= round(threshold, 2) if max_s > 0 else False
@@ -601,15 +730,42 @@ def score_task(task: dict, candidate_output: str) -> dict:
 
 
 def batch_score(task_dir: Path) -> dict:
-    """Score all *.json task files in a directory."""
+    """
+    Score all *.json task files in a directory.
+    
+    Args:
+        task_dir: Path to directory containing task JSON files
+    
+    Returns:
+        Dict with batch_dir, total_files, scored, passed, failed, pass_at_1, results
+    
+    Error handling:
+        - JSON decode errors → logged in results with error field
+        - Missing candidate_output → skipped, counted in skipped_no_output
+        - Malformed tasks → logged in results with error field
+    """
     results = []
     missing_outputs = 0
+    json_errors = 0
 
     for task_file in sorted(task_dir.glob("*.json")):
         try:
             task = json.loads(task_file.read_text(encoding="utf-8"))
         except json.JSONDecodeError as e:
-            results.append({"task_id": task_file.stem, "error": str(e), "pass": False})
+            json_errors += 1
+            results.append({
+                "task_id": task_file.stem,
+                "error": f"JSON decode error: {str(e)}",
+                "pass": False
+            })
+            continue
+        except Exception as e:
+            json_errors += 1
+            results.append({
+                "task_id": task_file.stem,
+                "error": f"File read error: {type(e).__name__}: {str(e)}",
+                "pass": False
+            })
             continue
 
         candidate = task.get("candidate_output")
@@ -628,6 +784,7 @@ def batch_score(task_dir: Path) -> dict:
         "total_files": len(list(task_dir.glob("*.json"))),
         "scored": n,
         "skipped_no_output": missing_outputs,
+        "json_errors": json_errors,
         "passed": passed,
         "failed": n - passed,
         "pass_at_1": round(passed / n, 4) if n > 0 else None,

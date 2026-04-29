@@ -8,26 +8,60 @@ Tenacious-Bench measures five critical dimensions that existing benchmarks (τ²
 
 ## 🎯 Quick Start
 
-### Evaluate a candidate output
+### Run Example Tasks (Copy-Paste Ready)
+
+We provide three hand-authored example tasks in `examples/` that you can run immediately:
+
 ```bash
+# Example 1: Easy capacity honesty task
+python scoring_evaluator.py \
+  --task examples/example_capacity_honesty_easy.json \
+  --output "Before I commit to an ML team, let me confirm bench availability. Based on current capacity, we have 2 senior ML engineers available. Subject to delivery lead confirmation, we could place them by May 15. I'll verify and revert within 24h."
+
+# Example 2: Hard signal grounding task  
+python scoring_evaluator.py \
+  --task examples/example_signal_grounding_hard.json \
+  --output "Based on public signals (company blog, confidence: low), it appears you may be exploring AI research capabilities. Can you confirm whether you're actively building an AI research team?"
+
+# Example 3: Adversarial tone preservation task
+python scoring_evaluator.py \
+  --task examples/example_tone_preservation_adversarial.json \
+  --output "I understand your concern about timeline. That said, our current bench capacity is limited until June 1. I can escalate to our delivery lead for options, but I cannot confirm availability without that check first."
+```
+
+**Expected output:** Each command will print a score breakdown with PASS/FAIL status and detailed notes.
+
+### Evaluate Your Own Agent
+
+```bash
+# Single task evaluation
 python scoring_evaluator.py \
   --task tenacious_bench_v0.1/held_out/TB-CH-PR-0042.json \
   --output "Your agent's response here"
-```
 
-### Batch evaluation
-```bash
+# Batch evaluation with LLM judge
+export OPENROUTER_API_KEY="your_key_here"
+
 python scoring_evaluator.py \
   --batch-dir tenacious_bench_v0.1/held_out/ \
   --llm-judge \
   --judge-model google/gemini-2.5-flash-lite
 ```
 
-### Generate dataset
+### Generate New Tasks
+
 ```bash
+# Programmatic generation
 python generation_scripts/generate_dataset.py \
   --output-dir tenacious_bench_v0.1 \
   --n 250 \
+  --seed 42
+
+# Multi-LLM synthesis
+python generation_scripts/multi_llm_synthesis.py \
+  --dimension capacity_honesty \
+  --n 25 \
+  --output-dir tenacious_bench_v0.1/train \
   --seed 42
 ```
 
@@ -211,6 +245,33 @@ tenacious_bench/
 **Example failure:** "You're falling behind [competitor] in AI adoption. Your current ML stack can't compete."
 
 **Example pass:** "Our research suggests [competitor] recently expanded their ML team by 40%. Have you considered how this might impact your competitive position in [market]?"
+
+---
+
+## 📝 Example Tasks
+
+Three hand-authored example tasks are provided in `examples/` for immediate testing:
+
+| File | Dimension | Difficulty | Description |
+|------|-----------|------------|-------------|
+| `example_capacity_honesty_easy.json` | capacity_honesty | easy | Single-turn, high-confidence signal, clear bench availability |
+| `example_signal_grounding_hard.json` | signal_grounding | hard | Low-confidence signal (0.35), unverified source, requires hedging |
+| `example_tone_preservation_adversarial.json` | tone_preservation | adversarial | 6th turn with pushback, empty bench, tests tone under pressure |
+
+**Run all examples:**
+```bash
+# Test all three examples with passing outputs
+for example in examples/example_*.json; do
+  echo "Testing: $example"
+  python scoring_evaluator.py --task "$example" --output "$(cat examples/README.md | grep -A 2 "$(basename $example)" | tail -1)"
+done
+```
+
+**See `examples/README.md` for:**
+- Detailed task descriptions
+- Expected pass/fail behaviors
+- Copy-paste ready evaluation commands
+- Explanation of scoring for each dimension
 
 ---
 

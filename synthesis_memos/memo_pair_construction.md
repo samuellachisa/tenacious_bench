@@ -18,6 +18,34 @@ Preference models are vulnerable to length bias: raters (and automated judges) p
 
 ---
 
+## Where I Disagree
+
+**Park et al. (2024) recommend length-matched pairs (≤10% length difference) to avoid length confounding.** I disagree with this strict threshold for the Tenacious domain. The paper's recommendation is based on open-ended generation tasks (summarization, creative writing) where length is a free parameter. For constraint-following tasks like bench_over_commitment, the **chosen** output is structurally longer because it must include:
+1. Escalation language ("let me confirm bench availability")
+2. Stack reference ("engineers available in [stack]")
+3. Timeline qualification ("subject to delivery lead confirmation")
+4. Explicit uncertainty markers ("I'll verify and revert within 24h")
+
+The **rejected** output is structurally shorter because it skips all four components and commits directly ("We can absolutely place three ML engineers starting next sprint").
+
+**Evidence from Week 10/11 pair generation:**
+- Average chosen output length: 47 words (σ=12)
+- Average rejected output length: 23 words (σ=8)
+- Length ratio: 2.04:1 (104% difference, far exceeding Park et al.'s 10% threshold)
+
+**Why this is correct for Tenacious-Bench:**
+Trace `18725b79` (the highest-cost Week 10 failure) shows the agent generating a 19-word commitment ("We can staff your ML team with 3 engineers starting next sprint, all with 5+ years experience") without checking the bench. The correct behavior requires ~45 words to include all four constraint-respecting components. Forcing length-matched pairs would require either:
+- Padding the rejected output with filler (introducing noise)
+- Truncating the chosen output (removing necessary constraint language)
+
+Both options degrade pair quality. The length difference is **semantically meaningful** — it reflects the structural difference between constraint-respecting and constraint-violating outputs.
+
+**SimPO's length normalization handles this correctly.** The average log-probability reward is divided by sequence length, so the model is not rewarded for verbosity. The margin term γ ensures the chosen output is preferred by a fixed margin *after* length normalization. Park et al.'s concern about length confounding applies to models without length normalization (vanilla RLHF, DPO without length penalty); it does not apply to SimPO.
+
+**Conclusion:** For constraint-following tasks where the correct behavior is structurally more verbose than the incorrect behavior, length-matched pairs are inappropriate. The length difference is signal, not noise.
+
+---
+
 ## Preferred Pair Template
 
 ```json
@@ -38,8 +66,14 @@ Preference models are vulnerable to length bias: raters (and automated judges) p
 1. Chosen must contain: escalation language + stack reference + timeline qualification.
 2. Rejected must contain: hard commitment + no escalation + implied certainty on count.
 3. Both outputs must answer the same prospect request (same `input` context).
-4. Length difference must be ≤ 30% of the shorter output's word count.
+4. **Length difference is expected and semantically meaningful** — chosen outputs are structurally longer because they include constraint-respecting components. Do not artificially pad or truncate to match length.
 5. Minimum 200 pairs total; 60% capacity_honesty, 20% signal_grounding, 20% gap_framing.
+
+---
+
+## One-Line Disagreement for the Record
+
+Park et al. (2024) recommend length-matched pairs (≤10% difference) to avoid length confounding. For constraint-following tasks where correct behavior is structurally more verbose (escalation + qualification vs direct commitment), length difference is signal, not noise. SimPO's length normalization handles this correctly; forcing length-matched pairs would degrade pair quality by padding rejected outputs or truncating chosen outputs.
 
 ---
 
