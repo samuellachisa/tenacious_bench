@@ -1,0 +1,152 @@
+{
+  "P-001": {
+    "triggered": false,
+    "cost": 0,
+    "notes": "Fixed: Now hedges when <5 roles"
+  },
+  "P-002": {
+    "triggered": false,
+    "cost": 0,
+    "notes": "Mixed signal logic still working"
+  },
+  "P-003": {
+    "triggered": false,
+    "cost": 0,
+    "notes": "Fixed: Bench capacity check implemented"
+  },
+  "P-004": {
+    "triggered": false,
+    "cost": 0,
+    "notes": "Tone remains professional"
+  },
+  "P-005": {
+    "triggered": false,
+    "cost": 0,
+    "notes": "Thread isolation working"
+  },
+  "P-006": {
+    "triggered": false,
+    "cost": 0,
+    "notes": "Fixed: AI maturity scoring more conservative"
+  },
+  "P-007": {
+    "triggered": false,
+    "cost": 0,
+    "notes": "Consulting disqualifier working"
+  },
+  "P-008": {
+    "triggered": false,
+    "cost": 0,
+    "notes": "Fixed: ML bench capacity now checked"
+  },
+  "P-009": {
+    "triggered": false,
+    "cost": 0,
+    "notes": "Style guide maintained"
+  },
+  "P-010": {
+    "triggered": false,
+    "cost": 0,
+    "notes": "Pricing isolation working"
+  },
+  "P-011": {
+    "triggered": false,
+    "cost": 0,
+    "notes": "Fixed: Velocity returns 'insufficient_signal' when no history"
+  },
+  "P-012": {
+    "triggered": false,
+    "cost": 0,
+    "notes": "Boundary logic consistent"
+  },
+  "P-013": {
+    "triggered": false,
+    "cost": 0,
+    "notes": "Fixed: Infra/DevOps capacity now checked"
+  },
+  "P-014": {
+    "triggered": false,
+    "cost": 0,
+    "notes": "Formality floor maintained"
+  },
+  "P-015": {
+    "triggered": false,
+    "cost": 0,
+    "notes": "Name matching working"
+  },
+  "P-016": {
+    "triggered": false,
+    "cost": 0,
+    "notes": "Fixed: Low confidence gaps now hedged"
+  },
+  "P-017": {
+    "triggered": false,
+    "cost": 0,
+    "notes": "Off-by-one still fixed"
+  },
+  "P-018": {
+    "triggered": false,
+    "cost": 0,
+    "notes": "Fixed: Go capacity now checked"
+  },
+  "P-019": {
+    "triggered": false,
+    "cost": 0,
+    "notes": "Timezone validation working"
+  },
+  "P-020": {
+    "triggered": false,
+    "cost": 0,
+    "notes": "Timezone arithmetic correct"
+  },
+  "P-021": {
+    "triggered": false,
+    "cost": 0,
+    "notes": "Fixed: Stale news now filtered (>12 months)"
+  },
+  "P-022": {
+    "triggered": false,
+    "cost": 0,
+    "notes": "DST handled by Cal.com"
+  },
+  "P-023": {
+    "triggered": false,
+    "cost": 0,
+    "notes": "Fixed: Marketing copy no longer triggers false positive"
+  },
+  "P-024": {
+    "triggered": false,
+    "cost": 0,
+    "notes": "Expected limitation - no private signal"
+  },
+  "P-025": {
+    "triggered": false,
+    "cost": 0,
+    "notes": "Timezone parsing working"
+  },
+  "P-026": {
+    "triggered": false,
+    "cost": 0,
+    "notes": "Fixed: Low confidence gaps now hedged in pitch"
+  },
+  "P-027": {
+    "triggered": false,
+    "cost": 0,
+    "notes": "Fixed: Gap language now advisory, not accusatory"
+  },
+  "P-028": {
+    "triggered": false,
+    "cost": 0,
+    "notes": "Strategy inquiry working"
+  },
+  "P-029": {
+    "triggered": false,
+    "cost": 0,
+    "notes": "Booking flow working"
+  },
+  "P-030": {
+    "triggered": false,
+    "cost": 0,
+    "notes": "Fixed: Playwright retry limit now enforced (max 2)"
+  }
+}

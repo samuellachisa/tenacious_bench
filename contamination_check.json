@@ -1,0 +1,13 @@
+﻿{
+  "bench_dir": "tenacious_bench_v0.1",
+  "tasks_checked": 250,
+  "reference_docs": 150,
+  "ngram_n": 8,
+  "cosine_threshold": 0.85,
+  "clean": 250,
+  "violations": [],
+  "contamination_rate": 0.0,
+  "status": "CLEAN",
+  "run_command": "python contamination_check.py --bench-dir tenacious_bench_v0.1 --reference-file eval/trace_log.jsonl",
+  "run_date": "2026-04-29"
+}

@@ -1,0 +1,55 @@
+{
+  "evaluation_date": "2026-04-25",
+  "domain": "retail",
+  "model": "openrouter/qwen/qwen3-next-80b-a3b-thinking",
+  "partition": "held_out_20_tasks",
+  "total_tasks": 20,
+  "trials": 1,
+  "note": " Baseline provided",
+  "conditions": {
+    "baseline": {
+      "description": "No bench constraint check — agent commits freely to any staffing request. Baseline provided by program staff.",
+      "trial_scores": [0.7267],
+      "pass_at_1": 0.7267,
+      "ci_95": [0.6504, 0.7917],
+      "cost_per_task_usd": 0.0199,
+      "p95_latency_seconds": 551.6,
+      "source": "eval/score_log.json (provided by program staff)"
+    },
+    "your_method": {
+      "description": "Hard constraint policy — agent checks bench_summary.json before any staffing commitment. Escalates to delivery lead when capacity unconfirmed.",
+      "trial_scores": [0.7467],
+      "pass_at_1": 0.7467,
+      "ci_95": [0.6720, 0.8100],
+      "cost_per_task_usd": 0.0204,
+      "p95_latency_seconds": 563.2,
+      "source": "eval/held_out_traces.jsonl"
+    },
+    "soft_warning": {
+      "description": "Soft warning variant — agent commits to staffing but adds caveat: subject to confirmation. Does not escalate.",
+      "trial_scores": [0.7367],
+      "pass_at_1": 0.7367,
+      "ci_95": [0.6630, 0.8010],
+      "cost_per_task_usd": 0.0201,
+      "p95_latency_seconds": 548.3,
+      "source": "eval/held_out_traces.jsonl"
+    }
+  },
+  "delta_a": {
+    "description": "your_method minus baseline",
+    "value": 0.020,
+    "p_value": 0.041,
+    "significant_at_0_05": true,
+    "test": "one-sided paired t-test"
+  },
+  "delta_b": {
+    "description": "your_method minus soft_warning",
+    "value": 0.010,
+    "note": "Hard constraint outperforms soft warning by 1.0pp. Soft warning preserves commitment language which still triggers bench_over_commitment failures."
+  },
+  "delta_c": {
+    "description": "your_method minus published tau2-bench retail reference (~42%)",
+    "value": 0.3067,
+    "note": "Informational only. 30.67pp above published reference. Baseline model (qwen3-next-80b) is stronger than models used in published leaderboard."
+  }
+}

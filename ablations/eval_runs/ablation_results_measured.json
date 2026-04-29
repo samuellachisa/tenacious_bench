@@ -1,0 +1,85 @@
+{
+  "evaluation_date": "2026-04-29",
+  "bench_version": "tenacious_bench_v0.1",
+  "held_out_tasks": 50,
+  "model": "openai/gpt-4.1-mini",
+  "trials": 3,
+  "seed": 42,
+  "dry_run": false,
+  "conditions": {
+    "baseline": {
+      "overall_pass_at_1": 0.5667,
+      "trial_pass_rates": [
+        0.64,
+        0.66,
+        0.4
+      ],
+      "dimension_scores": {
+        "consent_coordination": 1.0,
+        "capacity_honesty": 0.0,
+        "gap_framing": 0.6667,
+        "signal_grounding": 0.2917,
+        "tone_preservation": 0.619
+      },
+      "total_cost_usd": 0.0177
+    },
+    "constrained": {
+      "overall_pass_at_1": 0.18,
+      "trial_pass_rates": [
+        0.18,
+        0.18,
+        0.18
+      ],
+      "dimension_scores": {
+        "consent_coordination": 0.0,
+        "capacity_honesty": 1.0,
+        "gap_framing": 0.0,
+        "signal_grounding": 0.0,
+        "tone_preservation": 0.0
+      },
+      "total_cost_usd": 0.0
+    },
+    "constrained_v2": {
+      "overall_pass_at_1": 0.18,
+      "trial_pass_rates": [
+        0.18,
+        0.18,
+        0.18
+      ],
+      "dimension_scores": {
+        "consent_coordination": 0.0,
+        "capacity_honesty": 1.0,
+        "gap_framing": 0.0,
+        "signal_grounding": 0.0,
+        "tone_preservation": 0.0
+      },
+      "total_cost_usd": 0.0
+    }
+  },
+  "deltas": {
+    "delta_A": {
+      "description": "constrained vs baseline",
+      "value": -0.3867,
+      "percentage_points": -38.67,
+      "t_statistic": -4.6289,
+      "p_value": 1.0,
+      "significant_at_0_05": false
+    },
+    "delta_B": {
+      "description": "constrained_v2 vs baseline",
+      "value": -0.3867,
+      "percentage_points": -38.67,
+      "t_statistic": -4.6289,
+      "p_value": 1.0,
+      "significant_at_0_05": false
+    },
+    "delta_C": {
+      "description": "constrained_v2 vs constrained (prompt improvement)",
+      "value": 0.0,
+      "percentage_points": 0.0,
+      "t_statistic": Infinity,
+      "p_value": 0.0,
+      "significant_at_0_05": true
+    }
+  }
+}

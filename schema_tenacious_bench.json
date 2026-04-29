@@ -1,0 +1,70 @@
+{
+  "title": "Tenacious-Bench v0.1 Task Schema",
+  "description": "Schema for evaluation tasks. Every task is machine-scorable: a script reads the task plus a candidate output and returns a numeric score with no human in the loop.",
+  "type": "object",
+  "required": [
+    "task_id",
+    "dimension",
+    "difficulty",
+    "source_mode",
+    "probe_refs",
+    "input",
+    "candidate_output",
+    "ground_truth",
+    "rubric",
+    "metadata"
+  ],
+  "properties": {
+    "task_id": {
+      "type": "string",
+      "description": "Unique identifier. Format: TB-{DIM}-{SRC}-{seq:04d}. E.g. TB-SG-TR-0001",
+      "pattern": "^TB-[A-Z]{2}-[A-Z]{2}-[0-9]{4}$"
+    },
+    "dimension": {
+      "type": "string",
+      "enum": [
+        "signal_grounding",
+        "capacity_honesty",
+        "tone_preservation",
+        "consent_coordination",
+        "gap_framing"
+      ]
+    },
+    "difficulty": {
+      "type": "string",
+      "enum": ["easy", "medium", "hard", "adversarial"]
+    },
+    "source_mode": {
+      "type": "string",
+      "enum": ["trace_derived", "programmatic", "multi_llm_synthesis", "hand_authored"]
+    },
+    "probe_refs": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1
+    },
+    "trace_refs": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "input": {
+      "type": "object",
+      "required": ["hiring_signal_brief", "bench_summary_snapshot", "prospect_context"]
+    },
+    "candidate_output": {
+      "description": "Populated at eval time; null in the dataset."
+    },
+    "ground_truth": {
+      "type": "object",
+      "required": ["expected_behaviors", "forbidden_behaviors"]
+    },
+    "rubric": {
+      "type": "object",
+      "required": ["max_score", "pass_threshold", "dimensions_scored"]
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["created_at", "author_model", "judge_model", "judge_score", "partition"]
+    }
+  }
+}

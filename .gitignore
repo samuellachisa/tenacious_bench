@@ -1,0 +1,217 @@
+# Tenacious-Bench .gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+
+# PyCharm
+.idea/
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# API keys and secrets
+*.key
+*.pem
+secrets.json
+credentials.json
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.cache/
+
+# Training artifacts
+training/lora_adapter/*.bin
+training/lora_adapter/*.safetensors
+training/lora_adapter/checkpoint-*/
+training/*.ckpt
+training/runs/
+training/wandb/
+
+# Model weights (large files)
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.bin
+models/
+
+# Evaluation outputs (keep structure, ignore large outputs)
+eval/eval_runs/*/outputs/
+eval/eval_runs/*/traces/
+eval/*.jsonl
+!eval/held_out_traces.jsonl
+!eval/trace_log.jsonl
+
+# Generated datasets (keep examples, ignore bulk)
+tenacious_bench_v0.1/train/*.json
+tenacious_bench_v0.1/dev/*.json
+tenacious_bench_v0.1/held_out/*.json
+!tenacious_bench_v0.1/train/TB-*-0001.json
+!tenacious_bench_v0.1/dev/TB-*-0001.json
+!tenacious_bench_v0.1/held_out/TB-*-0001.json
+
+# Ablation results (keep summary, ignore detailed runs)
+ablations/eval_runs/*/
+ablations/*.jsonl
+
+# Cost tracking (keep template, ignore actual logs)
+cost_log.csv
+!cost_log_template.csv
+
+# Contamination check outputs
+contamination_check_detailed.json
+
+# Judge filter outputs
+generation_scripts/filtered/
+generation_scripts/rejected/
+
+# Backup files
+*.bak
+*.backup
+*_backup.*
+
+# Coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.pytest_cache/
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Profiling
+*.prof
+*.lprof
+
+# Documentation builds
+docs/_build/
+docs/_static/
+docs/_templates/
+
+# Compressed files
+*.zip
+*.tar.gz
+*.tar.bz2
+*.rar
+*.7z
+
+# Large data files
+*.csv
+!cost_log_template.csv
+*.parquet
+*.feather
+*.h5
+*.hdf5
+
+# Visualization outputs
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+!figs/*.png
+!figs/*.jpg
+!figs/*.svg
+
+# HTML reports
+*.html
+!probes/trigger_trends.html
+
+# Temporary generation outputs
+generation_scripts/temp/
+generation_scripts/scratch/
+
+# Editor-specific
+*.sublime-project
+*.sublime-workspace
+
+# Package manager
+poetry.lock
+Pipfile.lock
+pdm.lock
+uv.lock
+
+# Pytest
+.pytest_cache/
+pytest_cache/
+
+# Ruff
+.ruff_cache/
+
+# Node (if any JS tooling is added)
+node_modules/
+package-lock.json
+yarn.lock
+
+# Misc
+TODO.md
+NOTES.md
+scratch/
+temp/
+tmp/

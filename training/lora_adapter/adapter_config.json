@@ -1,0 +1,28 @@
+{
+  "base_model_name_or_path": "unsloth/Qwen3-8B-bnb-4bit",
+  "bias": "none",
+  "fan_in_fan_out": false,
+  "inference_mode": true,
+  "init_lora_weights": true,
+  "lora_alpha": 32,
+  "lora_dropout": 0.05,
+  "modules_to_save": null,
+  "peft_type": "LORA",
+  "r": 16,
+  "revision": null,
+  "target_modules": [
+    "q_proj",
+    "v_proj",
+    "k_proj",
+    "o_proj"
+  ],
+  "task_type": "CAUSAL_LM",
+  "training_objective": "SimPO",
+  "simpo_beta": 2.0,
+  "simpo_gamma": 0.5,
+  "training_pairs": 200,
+  "epochs": 3,
+  "learning_rate": 5e-6,
+  "seed": 42,
+  "huggingface_repo": "samuellachisa/tenacious-bench-simpo-lora"
+}

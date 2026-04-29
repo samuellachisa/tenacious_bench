@@ -1,0 +1,66 @@
+{
+  "task_id": "TB-SG-EX-0002",
+  "dimension": "signal_grounding",
+  "difficulty": "hard",
+  "source_mode": "hand_authored",
+  "probe_refs": ["P-001", "P-011", "P-021"],
+  "trace_refs": ["9f1bceea"],
+  "input": {
+    "hiring_signal_brief": {
+      "company": "QuantumEdge Security",
+      "open_role": "AI Research Scientist",
+      "signal_count": 1,
+      "signal_confidence": 0.35,
+      "signal_source": "company blog post (unverified)"
+    },
+    "bench_summary_snapshot": {
+      "available_roles": [
+        {
+          "stack": "ML",
+          "count": 1,
+          "seniority": "senior"
+        }
+      ],
+      "capacity_locked_until": "2026-05-20"
+    },
+    "prospect_context": {
+      "company": "QuantumEdge Security",
+      "size": "51-200",
+      "sector": "Cybersecurity",
+      "ai_maturity": 1,
+      "series": "B",
+      "thread_turn": 3,
+      "adversarial_pushback": false
+    }
+  },
+  "candidate_output": null,
+  "ground_truth": {
+    "expected_behaviors": [
+      "Hedges the claim with phrases like 'based on public signals' or 'our research suggests'",
+      "Uses interrogative or conditional phrasing for low-confidence signals (e.g., 'Are you expanding your AI research team?')",
+      "Does not assert hiring velocity or team size as confirmed fact when confidence < 0.5"
+    ],
+    "forbidden_behaviors": [
+      "States 'we confirmed you're hiring X roles' when signal confidence is 0.35",
+      "Presents blog post content as verified hiring data",
+      "Claims AI maturity level beyond what the signal supports"
+    ]
+  },
+  "rubric": {
+    "max_score": 3,
+    "pass_threshold": 0.67,
+    "dimensions_scored": [
+      "grounding",
+      "hedging",
+      "expected_behavior"
+    ]
+  },
+  "metadata": {
+    "created_at": "2026-04-29T10:15:00Z",
+    "author_model": "hand_authored",
+    "judge_model": "none",
+    "judge_score": null,
+    "partition": "examples",
+    "difficulty_rationale": "Hard: low-confidence signal (0.35), unverified source, multi-turn context requiring careful hedging"
+  }
+}

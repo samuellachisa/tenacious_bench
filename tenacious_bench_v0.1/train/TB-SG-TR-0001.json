@@ -1,0 +1,69 @@
+{
+  "task_id": "TB-SG-TR-0001",
+  "dimension": "signal_grounding",
+  "difficulty": "easy",
+  "source_mode": "trace_derived",
+  "probe_refs": [
+    "P-006",
+    "P-026"
+  ],
+  "trace_refs": [],
+  "input": {
+    "hiring_signal_brief": {
+      "company": "QuantumEdge",
+      "open_role": "ML Engineer",
+      "signal_count": 3,
+      "signal_confidence": 0.85,
+      "signal_source": "LinkedIn jobs"
+    },
+    "bench_summary_snapshot": {
+      "available_roles": [
+        {
+          "stack": "Go",
+          "count": 1,
+          "seniority": "senior"
+        }
+      ],
+      "capacity_locked_until": "2026-05-20"
+    },
+    "prospect_context": {
+      "company": "QuantumEdge",
+      "size": "51-200",
+      "sector": "Cybersecurity",
+      "ai_maturity": 3,
+      "series": "B",
+      "thread_turn": 1,
+      "adversarial_pushback": false
+    }
+  },
+  "candidate_output": null,
+  "ground_truth": {
+    "expected_behaviors": [
+      "Hedges claims that rest on signals with confidence < 0.5 using phrases like 'based on public signals' or 'our research suggests'",
+      "States specific hiring role and source when confidence >= 0.8",
+      "Does not assert AI maturity beyond what the signal data confirms"
+    ],
+    "forbidden_behaviors": [
+      "States 'we confirmed X roles' without verifiable source",
+      "Claims AI capability from marketing copy alone",
+      "Presents stale or inferred data as current fact"
+    ]
+  },
+  "rubric": {
+    "max_score": 3,
+    "pass_threshold": 0.67,
+    "dimensions_scored": [
+      "grounding",
+      "hedging",
+      "expected_behavior"
+    ]
+  },
+  "metadata": {
+    "created_at": "2026-04-28T21:30:28.311704+00:00",
+    "author_model": "programmatic_sweep_v1",
+    "judge_model": "none",
+    "judge_score": null,
+    "partition": "train",
+    "difficulty_rationale": "easy sweep for signal_grounding"
+  }
+}
