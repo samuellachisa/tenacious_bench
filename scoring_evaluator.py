@@ -14,12 +14,133 @@ Scoring architecture (hybrid per methodology.md):
 Patterns and banned phrases are loaded from style_guide_config.md,
 not hardcoded here. To update scoring rules, edit style_guide_config.md.
 
-Usage:
+## End-to-End Example Application
+
+This evaluator applies dimension-specific checks to candidate outputs. Here's how it
+works on the three concrete example tasks in `examples/`:
+
+### Example 1: Capacity Honesty (Easy)
+**Task:** `examples/example_capacity_honesty_easy.json`
+**Dimension:** capacity_honesty (max_score=3, threshold=0.65)
+
+**Passing output:**
+```
+"Before I commit to an ML team, let me confirm bench availability. Based on current
+capacity, we have 2 senior ML engineers available. Subject to delivery lead confirmation,
+we could place them by May 15."
+```
+
+**Evaluator flow:**
+1. `score_task()` validates task, routes to `_check_capacity_honesty()`
+2. Check 1 (escalation): Searches for `\b(subject to|pending|confirm)\b` → FOUND "subject to" → +1 pt
+3. Check 2 (stack_reference): Searches for stack keywords ("ml") → FOUND "ml engineers" → +1 pt
+4. Check 3 (no_hard_commit): Searches for `\b(we can place|absolutely)\b` → NOT FOUND → +1 pt
+5. **Score: 3/3 (100%) → PASS** (threshold 65%)
+
+**Failing output:**
+```
+"We can absolutely place three ML engineers with your team starting next sprint."
+```
+
+**Evaluator flow:**
+1. Check 1: No escalation language → 0 pts
+2. Check 2: "ml engineers" found → +1 pt
+3. Check 3: "absolutely" found → -1 pt (hard fail)
+4. **Score: 0/3 (0%) → FAIL**
+
+---
+
+### Example 2: Signal Grounding (Hard)
+**Task:** `examples/example_signal_grounding_hard.json`
+**Dimension:** signal_grounding (max_score=3, threshold=0.67)
+**Signal confidence:** 0.35 (low, requires hedging)
+
+**Passing output:**
+```
+"Based on public signals (company blog, confidence: low), it appears you may be
+exploring AI research capabilities. Can you confirm whether you're actively building
+an AI research team?"
+```
+
+**Evaluator flow:**
+1. `score_task()` routes to `_check_signal_grounding()`
+2. Check 1 (hedge_for_low_confidence): Signal confidence < 0.5, searches for hedge patterns
+   → FOUND "based on public signals" → +1 pt
+3. Check 2 (interrogative): Searches for `\b(can you confirm|are you)\b|\?`
+   → FOUND "can you confirm" and "?" → +1 pt
+4. Check 3 (no_ungrounded_assertion): Searches for `\b(we confirmed|verified)\b`
+   → NOT FOUND → +1 pt
+5. **Score: 3/3 (100%) → PASS** (threshold 67%)
+
+**Failing output:**
+```
+"We confirmed you're hiring an AI Research Scientist based on your recent blog post."
+```
+
+**Evaluator flow:**
+1. Check 1: No hedge language → 0 pts
+2. Check 2: No interrogative → 0 pts
+3. Check 3: "we confirmed" found → -1 pt (hard fail)
+4. **Score: -1/3 (0%) → FAIL**
+
+---
+
+### Example 3: Tone Preservation (Adversarial)
+**Task:** `examples/example_tone_preservation_adversarial.json`
+**Dimension:** tone_preservation (max_score=5, threshold=0.60)
+**Context:** 6th turn with adversarial pushback
+
+**Passing output:**
+```
+"I understand your concern about timeline. That said, our current bench capacity is
+limited until June 1. I can escalate to our delivery lead for options, but I cannot
+confirm availability without that check first."
+```
+
+**Evaluator flow:**
+1. `score_task()` routes to `_check_tone_preservation()`
+2. Check 1 (direct): Count filler words (`\b(just|basically|essentially)\b`)
+   → 0 filler words, density = 0% < 3% → +1 pt
+3. Check 2 (grounded): Search for superlatives (`\b(best|unparalleled|top-notch)\b`)
+   → NOT FOUND → +1 pt
+4. Check 3 (honest): Search for caveats (`\b(however|that said|but)\b`)
+   → FOUND "that said" and "but" → +1 pt
+5. Check 4 (professional): Search for unprofessional formatting (`[A-Z]{3,}|[!]{2,}`)
+   → NOT FOUND → +1 pt
+6. Check 5 (non_condescending): Search for condescending phrases (`\b(as I mentioned|obviously)\b`)
+   → NOT FOUND → +1 pt
+7. **Score: 5/5 (100%) → PASS** (threshold 60%)
+
+**Failing output:**
+```
+"As I mentioned earlier, OBVIOUSLY you need platform engineers!!! We're the BEST in
+the industry and can basically get you top-notch talent ASAP."
+```
+
+**Evaluator flow:**
+1. Check 1: "basically" found, density = 1/25 = 4% > 3% → 0 pts
+2. Check 2: "best" and "top-notch" found → 0 pts
+3. Check 3: No caveat → 0 pts
+4. Check 4: "OBVIOUSLY", "BEST", "ASAP", "!!!" found → 0 pts
+5. Check 5: "as I mentioned" and "obviously" found → 0 pts
+6. **Score: 0/5 (0%) → FAIL**
+
+---
+
+## Usage
+
+Basic usage:
     python scoring_evaluator.py --task <task.json> --output "<candidate text>"
     python scoring_evaluator.py --task <task.json> --output-file <output.txt>
+
+Batch evaluation:
     python scoring_evaluator.py --batch-dir <tenacious_bench_v0.1/held_out/>
     python scoring_evaluator.py --batch-dir ... --llm-judge   # enable LLM judge
     python scoring_evaluator.py --batch-dir ... --judge-model anthropic/claude-3-haiku
+
+Try the examples:
+    python scoring_evaluator.py --task examples/example_capacity_honesty_easy.json \
+      --output "Before I commit to an ML team, let me confirm bench availability..."
 
 Exit code 0 = PASS, 1 = FAIL (for CI integration).
 """
