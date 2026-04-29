@@ -6,6 +6,35 @@ Tenacious-Bench measures five critical dimensions that existing benchmarks (τ²
 
 ---
 
+## ⚙️ Setup
+
+### Requirements
+
+- **Python:** 3.11+ (tested on 3.11.9)
+- **Key dependencies:** transformers, trl, unsloth, requests, scipy, jsonschema
+- **Optional:** PyTorch 2.5.1+ (required for training; not needed for evaluation-only)
+
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/samuellachisa/tenacious-agent.git
+cd tenacious-agent/tenacious_bench
+
+# Install dependencies
+pip install -r requirements.txt
+
+# For evaluation with LLM judge (optional)
+export OPENROUTER_API_KEY="your_key_here"
+
+# Verify installation
+python scoring_evaluator.py --help
+```
+
+**Note:** If you only need evaluation (not training), you can skip PyTorch installation. The scoring evaluator runs on CPU with minimal dependencies (requests, jsonschema, scipy).
+
+---
+
 ## 🎯 Quick Start
 
 ### Run Example Tasks (Copy-Paste Ready)
@@ -30,6 +59,23 @@ python scoring_evaluator.py \
 ```
 
 **Expected output:** Each command will print a score breakdown with PASS/FAIL status and detailed notes.
+
+### Run All Examples End-to-End
+
+To see the evaluator running on all three examples with both passing and failing outputs:
+
+```bash
+# Linux/Mac
+bash test_examples.sh
+
+# Windows PowerShell
+.\test_examples.ps1
+```
+
+These scripts demonstrate the evaluator working correctly on the three committed example files:
+- `examples/example_capacity_honesty_easy.json`
+- `examples/example_signal_grounding_hard.json`
+- `examples/example_tone_preservation_adversarial.json`
 
 ### Evaluate Your Own Agent
 
