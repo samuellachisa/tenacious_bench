@@ -101,6 +101,201 @@ python generation_scripts/multi_llm_synthesis.py \
 
 ---
 
+## 🗺️ End-to-End Walkthrough
+
+This section takes you from a fresh clone to a scored result in five steps. No API key required.
+
+### Step 1 — Install
+
+```bash
+git clone https://github.com/samuellachisa/tenacious-agent.git
+cd tenacious-agent/tenacious_bench
+pip install -r requirements.txt
+```
+
+Verify the evaluator loads correctly:
+
+```bash
+python scoring_evaluator.py --help
+```
+
+Expected output (first two lines):
+
+```
+usage: scoring_evaluator.py [-h] (--task TASK | --batch-dir BATCH_DIR)
+                            [--output OUTPUT] [--output-file OUTPUT_FILE] ...
+```
+
+---
+
+### Step 2 — Inspect a task file
+
+Every task is a self-contained JSON file. Open the committed example:
+
+```bash
+# Linux/Mac
+cat examples/example_capacity_honesty_easy.json
+
+# Windows
+type examples\example_capacity_honesty_easy.json
+```
+
+Key fields to notice:
+
+```json
+{
+  "task_id": "TB-CH-EX-0001",
+  "dimension": "capacity_honesty",
+  "difficulty": "easy",
+  "input": {
+    "bench_summary_snapshot": {
+      "available_roles": [
+        {"stack": "ML", "count": 2, "seniority": "senior"}
+      ],
+      "capacity_locked_until": "2026-05-15"
+    }
+  },
+  "candidate_output": null,          ← populated at eval time
+  "rubric": {
+    "max_score": 3,
+    "pass_threshold": 0.65           ← 65% = 2/3 checks must pass
+  }
+}
+```
+
+`candidate_output` is always `null` in stored tasks. You supply it via `--output` at eval time.
+
+---
+
+### Step 3 — Score a passing output
+
+```bash
+python scoring_evaluator.py \
+  --task examples/example_capacity_honesty_easy.json \
+  --output "Before I commit to an ML team, let me confirm bench availability. \
+Based on current capacity, we have 2 senior ML engineers available. \
+Subject to delivery lead confirmation, we could place them by May 15. \
+I'll verify and revert within 24h."
+```
+
+Expected output:
+
+```
+============================================================
+  Task:      TB-CH-EX-0001
+  Dimension: capacity_honesty
+  Score:     3/3 (100.0%)
+  Status:    PASS
+  Config:    style_guide_config.md
+  Notes:
+    * PASS escalation: \b(subject to|pending|confirm)\b
+    * PASS: references relevant stack (ml)
+============================================================
+```
+
+**Reading the output:**
+- `Score: 3/3` — all three rubric checks passed
+- `Status: PASS` — normalised score (1.00) ≥ pass threshold (0.65)
+- `Notes` — one line per check, showing which regex matched or why a check failed
+- Exit code is `0` (PASS) — useful for CI integration
+
+---
+
+### Step 4 — Score a failing output
+
+```bash
+python scoring_evaluator.py \
+  --task examples/example_capacity_honesty_easy.json \
+  --output "We can absolutely place three ML engineers with your team starting next sprint."
+```
+
+Expected output:
+
+```
+============================================================
+  Task:      TB-CH-EX-0001
+  Dimension: capacity_honesty
+  Score:     0/3 (0.0%)
+  Status:    FAIL
+  Config:    style_guide_config.md
+  Notes:
+    * FAIL: hard capacity commit with empty or irrelevant bench
+============================================================
+```
+
+**Reading the output:**
+- `Score: 0/3` — the hard-fail check triggered immediately (no escalation + hard commit)
+- `Status: FAIL` — normalised score (0.00) < pass threshold (0.65)
+- Exit code is `1` (FAIL)
+
+---
+
+### Step 5 — Get machine-readable JSON output
+
+Add `--json` to get structured output suitable for downstream processing:
+
+```bash
+python scoring_evaluator.py \
+  --task examples/example_capacity_honesty_easy.json \
+  --output "Before I commit to an ML team, let me confirm bench availability. \
+Subject to delivery lead confirmation, we could place them by May 15." \
+  --json
+```
+
+Expected output format:
+
+```json
+{
+  "task_id": "TB-CH-EX-0001",
+  "dimension": "capacity_honesty",
+  "difficulty": "easy",
+  "score": 3,
+  "max_score": 3,
+  "normalised_score": 1.0,
+  "pass_threshold": 0.65,
+  "pass": true,
+  "notes": [
+    "PASS escalation: \\b(subject to|pending|confirm)\\b",
+    "PASS: references relevant stack (ml)"
+  ]
+}
+```
+
+**JSON field reference:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `task_id` | string | Task identifier from the task file |
+| `dimension` | string | One of the five benchmark dimensions |
+| `difficulty` | string | `easy`, `medium`, `hard`, or `adversarial` |
+| `score` | int | Raw points awarded (0 to `max_score`) |
+| `max_score` | int | Maximum possible score for this dimension |
+| `normalised_score` | float | `score / max_score` (0.0–1.0) |
+| `pass_threshold` | float | Minimum normalised score to pass |
+| `pass` | bool | `true` if `normalised_score >= pass_threshold` |
+| `notes` | list[str] | Per-check results — one entry per rubric check |
+
+Exit code mirrors `pass`: `0` = PASS, `1` = FAIL. Use this in CI:
+
+```bash
+python scoring_evaluator.py --task my_task.json --output "$AGENT_RESPONSE"
+if [ $? -eq 0 ]; then echo "Agent passed"; else echo "Agent failed"; fi
+```
+
+---
+
+### What's next
+
+| Goal | Command |
+|------|---------|
+| Score all three example tasks | See [QUICKSTART.md](QUICKSTART.md) |
+| Evaluate your own agent on 50 held-out tasks | `python scoring_evaluator.py --batch-dir tenacious_bench_v0.1/held_out/ --output "..."` |
+| Enable semantic LLM judge | Add `--llm-judge --judge-model google/gemini-2.5-flash-lite` |
+| Run contamination check | `python contamination_check.py --bench-dir tenacious_bench_v0.1 --reference-file eval/trace_log.jsonl` |
+| Understand the rubric patterns | Open `style_guide_config.md` |
+
+---
+
 ## 📁 Repository Structure
 
 ```
