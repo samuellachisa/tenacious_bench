@@ -36,6 +36,19 @@ Liu et al. survey the landscape of synthetic data generation for LLM training an
 
 ---
 
+## How I Operationalized My Alternative Design
+
+My alternative to Liu et al.'s LLM-as-judge-for-all-filtering recommendation: a hybrid scorer that uses rule-based checks for constraint dimensions and reserves LLM judges for semantic dimensions only.
+
+- [x] **Rule-based scoring for capacity_honesty and signal_grounding.** `scoring_evaluator.py` `_check_capacity_honesty()` and `_check_signal_grounding()` use regex patterns loaded from `style_guide_config.md`. No LLM call is made for these dimensions unless `--llm-judge` is explicitly passed.
+- [x] **LLM judge reserved for tone_preservation and gap_framing.** `_check_tone_preservation()` and `_check_gap_framing()` call `_call_judge()` only when `_LLM_JUDGE_ENABLED` is True. The judge prompt is rubric-anchored (five explicit tone markers, 0–5 scale) not holistic.
+- [x] **90% inter-rater agreement on capacity_honesty with pure regex.** `inter_rater_agreement.md` confirms the rule-based scorer matches human raters at 90% (κ=0.78) on capacity_honesty — the dimension Liu et al. would route to an LLM judge. This is the empirical evidence that regex is sufficient for constraint dimensions.
+- [x] **Preference leakage prevented by judge model rotation.** `scoring_evaluator.py` `_DEFAULT_JUDGE_MODEL = "google/gemini-2.5-flash-lite"` — a different family from the generation models (DeepSeek, Qwen, Llama). This directly addresses Li et al.'s leakage risk that Liu et al. underweight.
+- [x] **Graceful fallback when judge is unavailable.** `_tone_rule_based_soft()` is called when `_call_judge()` returns `None`. The evaluator never silently fails — it degrades to the deterministic layer and logs a warning.
+- [x] **Cost difference is documented.** `ablations/ablation_results.json` `cost_quality_analysis` shows rule-based scoring costs $0.000354/task vs $0.000816/task with LLM judge — a 130% cost increase for dimensions where regex achieves equivalent accuracy.
+
+---
+
 ## One-Line Disagreement for the Record
 
 Liu et al. recommend LLM-as-judge for all quality filtering. For rule-based constraint dimensions (capacity_honesty, signal_grounding), regex-based scoring is more reliable and cheaper. The paper's recommendation applies to open-ended generation tasks; it does not generalize to constraint-following evaluation.

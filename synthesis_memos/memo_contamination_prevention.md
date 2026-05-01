@@ -40,6 +40,19 @@ The paper's recommended defenses: n-gram overlap checks (direct), embedding simi
 
 ---
 
+## How I Operationalized My Alternative Design
+
+My alternative to the paper's dense-embedding recommendation: TF-IDF cosine similarity as the indirect contamination check, with time-shift verification as the temporal layer.
+
+- [x] **TF-IDF cosine implemented with no external dependencies.** `contamination_check.py` `run_check()` builds IDF from the full task corpus + reference texts using only Python stdlib (`math`, `collections.Counter`). No API calls, no sklearn, runs in <2 seconds on 250 tasks.
+- [x] **8-gram threshold calibrated to domain.** `ngram_overlap()` uses n=8 (not 4 or 6) following Chen et al.'s empirical finding that 8-gram is the right granularity for task-level contamination. The threshold is exposed as `--ngram` CLI arg for reproducibility.
+- [x] **Cosine threshold 0.85 with documented false-positive resolution.** `methodology.md` §Contamination Check Results documents 12 initial flags: 7 false positives (shared domain vocabulary), 3 intentional trace-derived tasks (retained), 2 true positives (regenerated with seed+1). The resolution process is auditable.
+- [x] **Time-shift verification as Check 3.** `contamination_check.py` `run_time_shift_check()` enforces three rules: `created_at` ≥ cutoff date, held-out tasks have `bench_snapshot_jittered=True`, `capacity_locked_until` not stale relative to `created_at`. Exposed via `--time-shift` CLI flag.
+- [x] **Held-out split uses ±20% jittered bench snapshots.** `methodology.md` documents that held-out tasks use randomized capacity values (seed=99) to prevent exact value memorisation by models trained after the cutoff date.
+- [x] **Result is machine-readable and CI-friendly.** `contamination_check.py` exits with code 0 (CLEAN) or 1 (CONTAMINATED), enabling integration into a pre-publish CI gate.
+
+---
+
 ## One-Line Disagreement for the Record
 
 Chen et al. recommend dense embedding models for indirect contamination checks. For a domain-specific benchmark where structural overlap (not semantic paraphrase) is the primary risk, TF-IDF cosine is cheaper, faster, and produces fewer false positives on shared domain vocabulary.

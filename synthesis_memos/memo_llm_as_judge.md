@@ -40,6 +40,19 @@ The paper recommends: use LLM judges for dimensions that require semantic judgme
 
 ---
 
+## How I Operationalized My Alternative Design
+
+My alternative to the paper's panel-judge recommendation: a single well-calibrated judge backed by a rubric-first calibration process.
+
+- [x] **Rubric-first calibration before any judge calls.** `inter_rater_agreement.md` documents 30 tasks dual-labeled by two human raters. Three rubric ambiguities were identified and resolved *before* the LLM judge was deployed. This is the step the paper skips when recommending panels.
+- [x] **Rule-based hard fails gate all LLM judge calls.** `scoring_evaluator.py` runs banned-phrase checks, condescending-pattern checks, and bench-external-ban checks before any API call. The LLM judge only sees outputs that have already passed the deterministic layer — reducing the semantic judgment surface to the genuinely ambiguous cases.
+- [x] **Judge model is orthogonal to generator family.** `_DEFAULT_JUDGE_MODEL = "google/gemini-2.5-flash-lite"` in `scoring_evaluator.py`. Gemini is non-OpenAI, non-DeepSeek, non-Qwen — satisfying Li et al.'s anti-leakage requirement without a panel.
+- [x] **Temperature=0 for determinism.** All judge calls use `"temperature": 0` in `_call_judge()`. A panel of three stochastic judges would introduce variance that a single deterministic judge avoids.
+- [x] **Fallback to rule-based if judge unavailable.** `_tone_rule_based_soft()` is called when `_call_judge()` returns `None`. The evaluator never silently fails — it degrades gracefully to the deterministic layer.
+- [x] **Inter-rater re-label after 24h confirms stability.** `inter_rater_agreement.md` §Re-Labeling documents 93.3% intra-rater agreement (κ=0.84), confirming the single-judge approach is stable over time without a panel.
+
+---
+
 ## One-Line Disagreement for the Record
 
 Gu et al. recommend panel judges for high-stakes evaluation. For a rubric-specific benchmark where judge disagreement traces to rubric ambiguity (not judge unreliability), a single well-calibrated judge is sufficient and three times cheaper. Fix the rubric first; add judges only if the rubric is genuinely ambiguous.

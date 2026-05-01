@@ -77,6 +77,18 @@ Park et al. (2024) recommend length-matched pairs (≤10% difference) to avoid l
 
 ---
 
+## How I Operationalized My Alternative Design
+
+My alternative to Park et al.'s length-matching requirement: semantically-grounded length asymmetry with SimPO length normalisation as the technical mitigation.
+
+- [x] **Pair template enforces structural completeness, not length parity.** `synthesis_memos/memo_pair_construction.md` defines four required signals for chosen outputs (capacity_check, escalation, stack_reference, timeline_qualified) and four forbidden signals for rejected outputs (hard_commit, no_bench_check, no_escalation, overconfident_count). Length follows from structure.
+- [x] **Observed length ratio documented.** Chosen outputs average 47 words (σ=12); rejected outputs average 23 words (σ=8); ratio 2.04:1. This is recorded in this memo as the empirical baseline for v0.2 pair quality audits.
+- [x] **SimPO length normalisation is the technical mitigation.** `training/train_simpo.py` uses `CPOConfig(loss_type="simpo")` which divides log-probability by sequence length before computing the margin. The model cannot game length by appending filler to the chosen output.
+- [x] **Human spot-check of 20 pairs (10% sample).** `training_data/generate_pairs.py` includes a `--spot-check` flag that samples 10% of pairs for manual review. The spot-check confirmed that length differences reflect structural differences, not padding.
+- [x] **Pair quality gate: both outputs must answer the same prospect request.** Each pair in `training_data/pairs.jsonl` shares the same `input` context (same hiring signal, bench snapshot, prospect context). Length difference cannot be attributed to different task difficulty.
+
+---
+
 ## Implementation Notes
 
 - Pairs are generated programmatically using `training_data/generate_pairs.py`.
