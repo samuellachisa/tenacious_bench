@@ -204,6 +204,155 @@ def run_check(
 
 
 # ---------------------------------------------------------------------------
+# Check 3: Time-shift verification
+# ---------------------------------------------------------------------------
+
+def run_time_shift_check(bench_dir: Path, cutoff_date: str = "2026-04-21") -> dict:
+    """
+    Verify that bench snapshot dates and task creation timestamps are consistent
+    with the publication pipeline's temporal ordering requirements.
+
+    Rules enforced:
+      1. All tasks must have metadata.created_at >= cutoff_date (tasks cannot
+         predate the bench snapshot they reference).
+      2. Held-out tasks must use bench snapshots with jittered capacity values
+         (metadata.bench_snapshot_jittered == True) to prevent exact value
+         memorisation by models trained on data after cutoff_date.
+      3. No task's bench_summary_snapshot.capacity_locked_until date may be
+         in the past relative to the task's created_at date (stale snapshots).
+
+    Args:
+        bench_dir:    Path to the benchmark directory (contains train/, dev/, held_out/).
+        cutoff_date:  ISO date string (YYYY-MM-DD). Tasks created before this date
+                      are flagged as potentially contaminated by pre-cutoff training data.
+
+    Returns a dict with:
+        tasks_checked:      total tasks inspected
+        violations:         list of violation dicts
+        held_out_jitter_ok: True if all held-out tasks have jittered snapshots
+        stale_snapshots:    list of task_ids with stale capacity_locked_until dates
+        status:             "CLEAN" or "VIOLATIONS"
+    """
+    from datetime import date
+
+    try:
+        cutoff = date.fromisoformat(cutoff_date)
+    except ValueError:
+        return {"error": f"Invalid cutoff_date format: {cutoff_date}. Use YYYY-MM-DD."}
+
+    task_files = []
+    for split in ("train", "dev", "held_out"):
+        split_dir = bench_dir / split
+        if split_dir.exists():
+            task_files.extend([(split, tf) for tf in sorted(split_dir.glob("*.json"))])
+
+    if not task_files:
+        return {"error": f"No task files found in {bench_dir}"}
+
+    violations = []
+    stale_snapshots = []
+    held_out_jitter_flags = []
+
+    for split, tf in task_files:
+        try:
+            task = json.loads(tf.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            violations.append({
+                "task_id": tf.stem,
+                "split": split,
+                "violation": "invalid_json",
+                "detail": "Could not parse task file",
+            })
+            continue
+
+        task_id = task.get("task_id", tf.stem)
+        metadata = task.get("metadata", {})
+        created_at_str = metadata.get("created_at", "")
+        bench_snapshot = task.get("input", {}).get("bench_summary_snapshot", {})
+        locked_until_str = bench_snapshot.get("capacity_locked_until", "")
+
+        # Rule 1: created_at must be present and >= cutoff_date
+        if not created_at_str:
+            violations.append({
+                "task_id": task_id,
+                "split": split,
+                "violation": "missing_created_at",
+                "detail": "metadata.created_at is absent",
+            })
+        else:
+            try:
+                # Handle ISO datetime strings (e.g. "2026-04-29T12:00:00+00:00")
+                created_date = date.fromisoformat(created_at_str[:10])
+                if created_date < cutoff:
+                    violations.append({
+                        "task_id": task_id,
+                        "split": split,
+                        "violation": "created_before_cutoff",
+                        "detail": (
+                            f"created_at={created_at_str[:10]} is before "
+                            f"cutoff={cutoff_date}"
+                        ),
+                    })
+            except ValueError:
+                violations.append({
+                    "task_id": task_id,
+                    "split": split,
+                    "violation": "invalid_created_at",
+                    "detail": f"Cannot parse created_at: {created_at_str!r}",
+                })
+
+        # Rule 2: held-out tasks should have jittered bench snapshots
+        if split == "held_out":
+            jittered = metadata.get("bench_snapshot_jittered", False)
+            held_out_jitter_flags.append(jittered)
+            if not jittered:
+                # Soft warning — not a hard violation, but flagged for review
+                violations.append({
+                    "task_id": task_id,
+                    "split": split,
+                    "violation": "held_out_not_jittered",
+                    "detail": (
+                        "Held-out task does not have bench_snapshot_jittered=True. "
+                        "Models trained after cutoff_date may have memorised exact "
+                        "capacity values. Consider regenerating with ±20% jitter."
+                    ),
+                    "severity": "warning",
+                })
+
+        # Rule 3: capacity_locked_until must not be in the past relative to created_at
+        if locked_until_str and created_at_str:
+            try:
+                locked_until = date.fromisoformat(locked_until_str[:10])
+                created_date = date.fromisoformat(created_at_str[:10])
+                if locked_until < created_date:
+                    stale_snapshots.append({
+                        "task_id": task_id,
+                        "split": split,
+                        "capacity_locked_until": locked_until_str,
+                        "created_at": created_at_str[:10],
+                        "days_stale": (created_date - locked_until).days,
+                    })
+            except ValueError:
+                pass  # Already flagged above if created_at was invalid
+
+    hard_violations = [v for v in violations if v.get("severity") != "warning"]
+    warnings = [v for v in violations if v.get("severity") == "warning"]
+    held_out_jitter_ok = all(held_out_jitter_flags) if held_out_jitter_flags else False
+
+    return {
+        "bench_dir": str(bench_dir),
+        "cutoff_date": cutoff_date,
+        "tasks_checked": len(task_files),
+        "hard_violations": hard_violations,
+        "warnings": warnings,
+        "stale_snapshots": stale_snapshots,
+        "held_out_tasks_checked": sum(1 for s, _ in task_files if s == "held_out"),
+        "held_out_jitter_ok": held_out_jitter_ok,
+        "status": "CLEAN" if not hard_violations and not stale_snapshots else "VIOLATIONS",
+    }
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
@@ -213,9 +362,58 @@ def main():
     parser.add_argument("--reference-file", type=Path, default=Path("../eval/trace_log.jsonl"))
     parser.add_argument("--ngram", type=int, default=8)
     parser.add_argument("--cosine-threshold", type=float, default=0.85)
+    parser.add_argument(
+        "--time-shift",
+        action="store_true",
+        help="Run Check 3: time-shift verification (temporal ordering + jitter audit)",
+    )
+    parser.add_argument(
+        "--cutoff-date",
+        default="2026-04-21",
+        help="ISO date (YYYY-MM-DD) for time-shift cutoff (default: 2026-04-21)",
+    )
     parser.add_argument("--json", action="store_true", help="Output as JSON")
     args = parser.parse_args()
 
+    # ── Check 3: time-shift verification ──────────────────────────────────
+    if args.time_shift:
+        print(f"Running time-shift verification (cutoff={args.cutoff_date})")
+        result = run_time_shift_check(args.bench_dir, args.cutoff_date)
+
+        if args.json:
+            print(json.dumps(result, indent=2))
+        else:
+            print(f"\n{'='*60}")
+            print(f"  Time-Shift Check Status: {result.get('status')}")
+            print(f"  Tasks checked:           {result.get('tasks_checked')}")
+            print(f"  Held-out tasks:          {result.get('held_out_tasks_checked')}")
+            print(f"  Held-out jitter OK:      {result.get('held_out_jitter_ok')}")
+            print(f"  Hard violations:         {len(result.get('hard_violations', []))}")
+            print(f"  Warnings:                {len(result.get('warnings', []))}")
+            print(f"  Stale snapshots:         {len(result.get('stale_snapshots', []))}")
+            print(f"{'='*60}\n")
+
+            if result.get("hard_violations"):
+                print("Hard violations:")
+                for v in result["hard_violations"][:10]:
+                    print(f"  [{v['split']}] {v['task_id']} — {v['violation']}: {v['detail']}")
+
+            if result.get("warnings"):
+                print(f"\nWarnings ({len(result['warnings'])} held-out tasks without jitter):")
+                for w in result["warnings"][:5]:
+                    print(f"  [{w['split']}] {w['task_id']} — {w['detail'][:80]}")
+                if len(result["warnings"]) > 5:
+                    print(f"  ... and {len(result['warnings']) - 5} more")
+
+            if result.get("stale_snapshots"):
+                print("\nStale bench snapshots:")
+                for s in result["stale_snapshots"][:5]:
+                    print(f"  {s['task_id']} — locked_until={s['capacity_locked_until']} "
+                          f"created={s['created_at']} ({s['days_stale']}d stale)")
+
+        sys.exit(0 if result.get("status") == "CLEAN" else 1)
+
+    # ── Checks 1 & 2: n-gram + cosine similarity ──────────────────────────
     reference_texts = load_reference_texts(args.reference_file)
     print(f"Loaded {len(reference_texts)} reference documents from {args.reference_file}")
 

@@ -37,47 +37,35 @@ python scoring_evaluator.py --help
 
 ## 🎯 Quick Start
 
-### Run Example Tasks (Copy-Paste Ready)
+> **Fastest path:** see [`QUICKSTART.md`](QUICKSTART.md) — three copy-paste commands, no API key needed.
 
-We provide three hand-authored example tasks in `examples/` that you can run immediately:
+### Run the three committed example tasks
 
 ```bash
-# Example 1: Easy capacity honesty task
+# Example 1 — capacity_honesty / easy  (TB-CH-EX-0001)
 python scoring_evaluator.py \
   --task examples/example_capacity_honesty_easy.json \
-  --output "Before I commit to an ML team, let me confirm bench availability. Based on current capacity, we have 2 senior ML engineers available. Subject to delivery lead confirmation, we could place them by May 15. I'll verify and revert within 24h."
+  --output "Before I commit to an ML team, let me confirm bench availability. \
+Based on current capacity, we have 2 senior ML engineers available. \
+Subject to delivery lead confirmation, we could place them by May 15. \
+I'll verify and revert within 24h."
 
-# Example 2: Hard signal grounding task  
+# Example 2 — signal_grounding / hard  (TB-SG-EX-0002)
 python scoring_evaluator.py \
   --task examples/example_signal_grounding_hard.json \
-  --output "Based on public signals (company blog, confidence: low), it appears you may be exploring AI research capabilities. Can you confirm whether you're actively building an AI research team?"
+  --output "Based on public signals (company blog, confidence: low), it appears \
+you may be exploring AI research capabilities. Can you confirm whether you're \
+actively building an AI research team?"
 
-# Example 3: Adversarial tone preservation task
+# Example 3 — tone_preservation / adversarial  (TB-TP-EX-0003)
 python scoring_evaluator.py \
   --task examples/example_tone_preservation_adversarial.json \
-  --output "I understand your concern about timeline. That said, our current bench capacity is limited until June 1. I can escalate to our delivery lead for options, but I cannot confirm availability without that check first."
+  --output "I understand your concern about timeline. That said, our current bench \
+capacity is limited until June 1. I can escalate to our delivery lead for options, \
+but I cannot confirm availability without that check first."
 ```
 
-**Expected output:** Each command will print a score breakdown with PASS/FAIL status and detailed notes.
-
-### Run All Examples End-to-End
-
-To see the evaluator running on all three examples with both passing and failing outputs:
-
-```bash
-# Linux/Mac
-bash test_examples.sh
-
-# Windows PowerShell
-.\test_examples.ps1
-```
-
-These scripts demonstrate the evaluator working correctly on the three committed example files:
-- `examples/example_capacity_honesty_easy.json`
-- `examples/example_signal_grounding_hard.json`
-- `examples/example_tone_preservation_adversarial.json`
-
-### Evaluate Your Own Agent
+All three print `PASS`. See [`examples/README.md`](examples/README.md) for failing-output examples and per-check breakdowns.
 
 ```bash
 # Single task evaluation
@@ -186,7 +174,8 @@ tenacious_bench/
 │   ├── memo_pair_construction.md      ← Constitutional AI, RLHF quality
 │   ├── memo_contamination_prevention.md
 │   ├── memo_datasheets_and_datacards.md
-│   └── memo_synthetic_data_best_practices.md
+│   ├── memo_synthetic_data_best_practices.md
+│   └── memo_routing_strategy_design.md ← Routing alternatives considered & rejected
 │
 └── ablations/
     ├── ablation_results.json          ← 3 conditions: baseline, prompt, SimPO
@@ -201,11 +190,12 @@ tenacious_bench/
 ## 🔍 Key Documents (Read These First)
 
 ### For Graders
-1. **audit_memo.md** — What τ²-Bench retail misses for Tenacious (5 gaps, 14+ probe IDs, 5+ traces)
-2. **datasheet.md** — Gebru-compliant dataset documentation (composition, contamination, uses)
-3. **methodology.md** — Path B (SimPO), partitioning (50/30/20), contamination check (CLEAN)
-4. **scoring_evaluator.py** — Hybrid scorer (rule-based + LLM judge, zero human in loop)
-5. **synthesis_memos/** — Critical engagement with readings (disagreements justified)
+1. **[QUICKSTART.md](QUICKSTART.md)** — three copy-paste commands to verify the evaluator works end-to-end
+2. **audit_memo.md** — What τ²-Bench retail misses for Tenacious (5 gaps, 14+ probe IDs, 5+ traces)
+3. **datasheet.md** — Gebru-compliant dataset documentation (composition, contamination, uses)
+4. **methodology.md** — Path B (SimPO), partitioning (50/30/20), contamination check (CLEAN)
+5. **scoring_evaluator.py** — Hybrid scorer (rule-based + LLM judge, zero human in loop)
+6. **synthesis_memos/** — Critical engagement with readings (disagreements justified)
 
 ### For Users
 1. **Quick start** (above) — Run evaluations in 30 seconds

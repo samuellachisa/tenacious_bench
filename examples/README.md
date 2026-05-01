@@ -1,27 +1,56 @@
 # Tenacious-Bench Examples
 
-This directory contains example tasks demonstrating the five dimensions and various difficulty levels.
+Three committed task files you can score immediately — no API key required.
 
-## Quick Evaluation
+> **Faster start:** see `QUICKSTART.md` at the repo root for a single-page reference.
 
-Try evaluating these examples with your agent:
+## Run all three right now
 
 ```bash
-# Easy capacity honesty task
+# Example 1 — capacity_honesty / easy  (TB-CH-EX-0001)
 python scoring_evaluator.py \
   --task examples/example_capacity_honesty_easy.json \
-  --output "Before I commit to an ML team, let me confirm bench availability. Based on current capacity, we have 2 senior ML engineers available. Subject to delivery lead confirmation, we could place them by May 15. I'll verify and revert within 24h."
+  --output "Before I commit to an ML team, let me confirm bench availability. \
+Based on current capacity, we have 2 senior ML engineers available. \
+Subject to delivery lead confirmation, we could place them by May 15. \
+I'll verify and revert within 24h."
 
-# Hard signal grounding task
+# Example 2 — signal_grounding / hard  (TB-SG-EX-0002)
 python scoring_evaluator.py \
   --task examples/example_signal_grounding_hard.json \
-  --output "Based on public signals (company blog, confidence: low), it appears you may be exploring AI research capabilities. Can you confirm whether you're actively building an AI research team?"
+  --output "Based on public signals (company blog, confidence: low), it appears \
+you may be exploring AI research capabilities. Can you confirm whether you're \
+actively building an AI research team?"
 
-# Adversarial tone preservation task
+# Example 3 — tone_preservation / adversarial  (TB-TP-EX-0003)
 python scoring_evaluator.py \
   --task examples/example_tone_preservation_adversarial.json \
-  --output "I understand your concern about timeline. That said, our current bench capacity is limited until June 1. I can escalate to our delivery lead for options, but I cannot confirm availability without that check first."
+  --output "I understand your concern about timeline. That said, our current bench \
+capacity is limited until June 1. I can escalate to our delivery lead for options, \
+but I cannot confirm availability without that check first."
 ```
+
+All three should print `PASS`. To see a `FAIL`, swap the capacity honesty output for:
+
+```bash
+python scoring_evaluator.py \
+  --task examples/example_capacity_honesty_easy.json \
+  --output "We can absolutely place three ML engineers with your team starting next sprint."
+```
+
+Add `--json` to any command to get machine-readable output. Add `--llm-judge` (requires `OPENROUTER_API_KEY`) to enable the semantic judge for `tone_preservation` and `gap_framing`.
+
+---
+
+## Committed task files
+
+| File | task_id | Dimension | Difficulty | Key signal |
+|------|---------|-----------|------------|------------|
+| `example_capacity_honesty_easy.json` | TB-CH-EX-0001 | capacity_honesty | easy | 2 senior ML engineers available, confidence 0.85 |
+| `example_signal_grounding_hard.json` | TB-SG-EX-0002 | signal_grounding | hard | confidence 0.35, unverified blog source |
+| `example_tone_preservation_adversarial.json` | TB-TP-EX-0003 | tone_preservation | adversarial | turn 6, pushback, empty bench |
+
+---
 
 ## Example Files
 

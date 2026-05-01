@@ -41,6 +41,11 @@ different model family to prevent preference leakage (Li et al. 2025).
 - Total generation pipeline: ~$1.30 (13% of $10 budget)
 - Remaining budget for held-out eval: ~$8.70
 
+For a full comparison of the five alternative routing strategies that were considered
+and rejected (single-family judge, eval-tier generation, panel judge, dimension-specialized
+routing, local model generation), see:
+  synthesis_memos/memo_routing_strategy_design.md
+
 ## Judge Dimensions and Thresholds
 
 The judge evaluates each generated task on 4 dimensions (0–10 scale):
