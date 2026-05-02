@@ -1,20 +1,4 @@
----
-license: cc-by-4.0
-task_categories:
-  - text-generation
-language:
-  - en
-tags:
-  - benchmark
-  - b2b-sales
-  - evaluation
-  - simpo
-  - lora
-  - preference-learning
-size_categories:
-  - n<1K
-pretty_name: Tenacious-Bench v0.1
----
+<div align="center">
 
 # Tenacious-Bench v0.1
 
@@ -26,6 +10,8 @@ pretty_name: Tenacious-Bench v0.1
 [![Pass@1 (SimPO)](https://img.shields.io/badge/pass%401%20SimPO-74%25-yellow)](ablations/ablation_results.json)
 
 **A specialized benchmark for B2B sales agent evaluation**
+
+</div>
 
 Tenacious-Bench measures five critical dimensions that existing benchmarks (τ²-Bench retail, WebArena, BrowseComp) do not capture: signal grounding, capacity honesty, tone preservation, consent-first coordination, and gap framing. These dimensions map directly to the highest-cost failure modes observed in the Tenacious Conversion Engine (Week 10 evidence).
 
