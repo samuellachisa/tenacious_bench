@@ -19,8 +19,53 @@ Usage:
 
 import argparse
 import json
+import os
+import random
 import sys
 from pathlib import Path
+
+
+# ---------------------------------------------------------------------------
+# Reproducibility
+# ---------------------------------------------------------------------------
+
+# Pinned HuggingFace model revision (git commit SHA).
+# Update this when intentionally upgrading the base model.
+# Retrieve with: huggingface_hub.model_info("Qwen/Qwen2.5-7B-Instruct").sha
+MODEL_REVISION = "bb46c15ee4bb56c5b63245ef50fd7637234d6f75"
+
+# Single seed constant — used everywhere: dataset split, trainer, torch, numpy, random.
+GLOBAL_SEED = 42
+
+
+def set_seed(seed: int = GLOBAL_SEED) -> None:
+    """
+    Centralized seed setter. Call once before any stochastic operation.
+
+    Covers: Python random, NumPy, PyTorch CPU + CUDA, HuggingFace transformers.
+    Sets PYTHONHASHSEED for subprocess reproducibility.
+    """
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    random.seed(seed)
+    try:
+        import numpy as np
+        np.random.seed(seed)
+    except ImportError:
+        pass
+    try:
+        import torch
+        torch.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+        # Deterministic ops where available (may reduce throughput slightly)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+    except ImportError:
+        pass
+    try:
+        from transformers import set_seed as hf_set_seed
+        hf_set_seed(seed)
+    except ImportError:
+        pass
 
 
 # ---------------------------------------------------------------------------
@@ -114,6 +159,8 @@ def dry_run(pairs_path: Path, args) -> None:
     print("=" * 70)
     print(f"  Pairs file : {pairs_path}  ({len(pairs)} pairs)")
     print(f"  Base model : {args.model}")
+    print(f"  Revision   : {args.model_revision}")
+    print(f"  Seed       : {args.seed}")
     print(f"  Output dir : {args.output_dir}")
     print(f"  Path       : {args.path}  ({cfg['loss_type'].upper()} loss)")
     print(f"  Epochs     : {epochs}")
@@ -229,6 +276,9 @@ def make_loss_logger(log_path: Path, path_label: str, hyperparams: dict):
 
 
 def run_training(args) -> None:
+    # Set all seeds before any stochastic operation
+    set_seed(args.seed)
+
     try:
         import torch
         from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
@@ -257,6 +307,8 @@ def run_training(args) -> None:
     hyperparams = {
         "Path:":           f"{args.path} — {cfg['description']}",
         "Base model:":     args.model,
+        "Revision:":       args.model_revision,
+        "Seed:":           args.seed,
         "Loss type:":      cfg["loss_type"],
         "Epochs:":         epochs,
         "LR:":             lr,
@@ -273,13 +325,17 @@ def run_training(args) -> None:
     print(f"Path {args.path}: {cfg['description']}")
     print(f"Loss log: {log_path}")
 
-    print(f"Loading tokenizer: {args.model}")
-    tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
+    print(f"Loading tokenizer: {args.model} @ {args.model_revision}")
+    tokenizer = AutoTokenizer.from_pretrained(
+        args.model,
+        revision=args.model_revision,
+        trust_remote_code=True,
+    )
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     tokenizer.padding_side = "left"
 
-    print(f"Loading model: {args.model} (4-bit quantized)")
+    print(f"Loading model: {args.model} @ {args.model_revision} (4-bit quantized)")
     bnb_config = BitsAndBytesConfig(
         load_in_4bit=True,
         bnb_4bit_quant_type="nf4",
@@ -288,6 +344,7 @@ def run_training(args) -> None:
     )
     model = AutoModelForCausalLM.from_pretrained(
         args.model,
+        revision=args.model_revision,
         quantization_config=bnb_config,
         device_map="auto",
         trust_remote_code=True,
@@ -325,7 +382,7 @@ def run_training(args) -> None:
             })
 
     dataset = Dataset.from_list(records)
-    split = dataset.train_test_split(test_size=0.2, seed=42)
+    split = dataset.train_test_split(test_size=0.2, seed=args.seed)
     train_dataset = split["train"]
     eval_dataset = split["test"]
     print(f"Train: {len(train_dataset)} pairs  |  Eval: {len(eval_dataset)} pairs")
@@ -354,6 +411,8 @@ def run_training(args) -> None:
             beta=cfg["simpo_beta"],
             cpo_alpha=cfg["simpo_gamma"],
             bf16=True,
+            seed=args.seed,
+            data_seed=args.seed,
             report_to="none",
             remove_unused_columns=False,
         )
@@ -369,7 +428,7 @@ def run_training(args) -> None:
         # Path A / Path C: SFT on chosen outputs
         sft_records = [{"text": r["prompt"] + "\n" + r["chosen"]} for r in records]
         sft_dataset = Dataset.from_list(sft_records)
-        sft_split = sft_dataset.train_test_split(test_size=0.2, seed=42)
+        sft_split = sft_dataset.train_test_split(test_size=0.2, seed=args.seed)
 
         training_args = SFTConfig(
             output_dir=str(output_dir),
@@ -384,6 +443,8 @@ def run_training(args) -> None:
             save_steps=100,
             eval_strategy="steps",
             bf16=True,
+            seed=args.seed,
+            data_seed=args.seed,
             report_to="none",
             dataset_text_field="text",
         )
@@ -407,6 +468,8 @@ def run_training(args) -> None:
         "path_description": cfg["description"],
         "loss_type": cfg["loss_type"],
         "base_model": args.model,
+        "model_revision": args.model_revision,
+        "seed": args.seed,
         "lora_rank": lora_rank,
         "simpo_beta": cfg.get("simpo_beta"),
         "simpo_gamma": cfg.get("simpo_gamma"),
@@ -435,6 +498,15 @@ def main():
                         help="Path to preference pairs JSONL file")
     parser.add_argument("--model", default="Qwen/Qwen2.5-7B-Instruct",
                         help="HuggingFace model ID")
+    parser.add_argument(
+        "--model-revision",
+        default=MODEL_REVISION,
+        help=(
+            f"HuggingFace model revision (git commit SHA or tag). "
+            f"Default: {MODEL_REVISION} (pinned). "
+            "Pass 'main' to use the latest commit (not recommended for reproducibility)."
+        ),
+    )
     parser.add_argument("--output-dir", default="training/lora_adapter",
                         help="Directory to save LoRA adapter")
     parser.add_argument(
@@ -458,6 +530,12 @@ def main():
     parser.add_argument("--lora-rank",  type=int,   default=None, help="Override LoRA rank")
     parser.add_argument("--dry-run", action="store_true",
                         help="Validate pairs file and print training plan without running")
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=GLOBAL_SEED,
+        help=f"Global random seed for dataset split, trainer, torch, numpy (default: {GLOBAL_SEED})",
+    )
     args = parser.parse_args()
 
     pairs_path = Path(args.pairs)
