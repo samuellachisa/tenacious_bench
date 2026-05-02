@@ -16,6 +16,8 @@ size_categories:
 pretty_name: Tenacious-Bench v0.1
 ---
 
+> **Note:** The YAML block above is a [HuggingFace dataset card](https://huggingface.co/datasets/samuellachisa/tenacious-bench) — it renders as a styled metadata card on HuggingFace. On GitHub it displays as a plain table, which is expected.
+
 # Tenacious-Bench v0.1
 
 **A specialized benchmark for B2B sales agent evaluation**
