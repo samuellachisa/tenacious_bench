@@ -4,7 +4,10 @@ Tenacious-Bench v0.1 — Dataset contamination checker.
 
 Checks for:
   1. N-gram overlap (< 8-gram threshold)
-  2. Cosine similarity via TF-IDF (>= 0.85 threshold)
+  2a. Cosine similarity via TF-IDF (>= 0.85 threshold)
+  2b. Embedding similarity via sentence-transformers (>= 0.85 threshold)
+       Falls back to TF-IDF-only if sentence-transformers is not installed.
+  3. Time-shift verification (--time-shift flag)
 
 between the benchmark tasks and any reference corpus (e.g. trace_log.jsonl,
 publicly available datasets).
@@ -15,6 +18,13 @@ Usage:
         --reference-file eval/trace_log.jsonl \
         --ngram 8 \
         --cosine-threshold 0.85
+
+    # With embedding similarity (requires: pip install sentence-transformers)
+    python contamination_check.py \
+        --bench-dir tenacious_bench_v0.1 \
+        --reference-file eval/trace_log.jsonl \
+        --embedding-model all-MiniLM-L6-v2 \
+        --embedding-threshold 0.85
 
 Exit code 0 = no contamination, 1 = contamination detected.
 """
@@ -88,6 +98,77 @@ def build_idf(corpus: list[str]) -> dict[str, float]:
 
 
 # ---------------------------------------------------------------------------
+# Embedding similarity (Check 2b)
+# ---------------------------------------------------------------------------
+
+def _try_load_embedding_model(model_name: str):
+    """
+    Attempt to load a sentence-transformers model.
+    Returns the model if available, None otherwise (graceful fallback).
+    """
+    try:
+        from sentence_transformers import SentenceTransformer
+        print(f"  [embedding] Loading model '{model_name}' ...", file=sys.stderr)
+        return SentenceTransformer(model_name)
+    except ImportError:
+        print(
+            "  [embedding] sentence-transformers not installed — skipping Check 2b.\n"
+            "  Install with: pip install sentence-transformers",
+            file=sys.stderr,
+        )
+        return None
+    except Exception as e:
+        print(f"  [embedding] Failed to load model '{model_name}': {e} — skipping Check 2b.",
+              file=sys.stderr)
+        return None
+
+
+def embedding_similarity_check(
+    task_texts: list[str],
+    reference_texts: list[str],
+    model,
+    threshold: float = 0.85,
+) -> list[dict]:
+    """
+    Compute cosine similarity between each task embedding and all reference
+    embeddings. Returns a list of violation dicts for tasks exceeding threshold.
+
+    Uses sentence-transformers for dense embeddings (all-MiniLM-L6-v2 by default).
+    This catches semantic paraphrase contamination that TF-IDF misses.
+    """
+    if not task_texts or not reference_texts:
+        return []
+
+    import numpy as np
+
+    print(
+        f"  [embedding] Encoding {len(task_texts)} tasks + {len(reference_texts)} refs ...",
+        file=sys.stderr,
+    )
+    task_embeddings = model.encode(task_texts, batch_size=32, show_progress_bar=False,
+                                   normalize_embeddings=True)
+    ref_embeddings = model.encode(reference_texts, batch_size=32, show_progress_bar=False,
+                                  normalize_embeddings=True)
+
+    # Cosine similarity matrix: (n_tasks, n_refs) — embeddings are L2-normalised
+    # so dot product == cosine similarity
+    sim_matrix = task_embeddings @ ref_embeddings.T  # shape: (n_tasks, n_refs)
+
+    violations = []
+    for i, row in enumerate(sim_matrix):
+        max_sim = float(row.max())
+        worst_ref_idx = int(row.argmax())
+        if max_sim >= threshold:
+            violations.append({
+                "task_index": i,
+                "max_embedding_similarity": round(max_sim, 4),
+                "worst_ref_index": worst_ref_idx,
+            })
+
+    return violations
+
+
+# ---------------------------------------------------------------------------
 # Task text extraction
 # ---------------------------------------------------------------------------
 
@@ -129,6 +210,8 @@ def run_check(
     reference_texts: list[str],
     ngram_n: int = 8,
     cosine_threshold: float = 0.85,
+    embedding_model=None,
+    embedding_threshold: float = 0.85,
 ) -> dict:
     task_files = []
     for split in ("train", "dev", "held_out"):
@@ -151,10 +234,23 @@ def run_check(
     all_docs = [t[2] for t in all_tasks] + reference_texts
     idf = build_idf([d for d in all_docs if d])
 
+    # ── Check 2b: embedding similarity (dense) ────────────────────────────
+    embedding_violations_by_index: set[int] = set()
+    embedding_details: dict[int, dict] = {}
+    if embedding_model is not None:
+        task_texts_for_embed = [t[2] for t in all_tasks if t[2]]
+        emb_violations = embedding_similarity_check(
+            task_texts_for_embed, reference_texts, embedding_model, embedding_threshold
+        )
+        for v in emb_violations:
+            idx = v["task_index"]
+            embedding_violations_by_index.add(idx)
+            embedding_details[idx] = v
+
     violations = []
     clean = 0
 
-    for tf, task, task_text in all_tasks:
+    for idx, (tf, task, task_text) in enumerate(all_tasks):
         if not task_text:
             continue
 
@@ -174,21 +270,31 @@ def run_check(
                 max_cosine = cos
                 worst_ref_idx = i
 
-        is_contaminated = max_ngram >= 1.0 or max_cosine >= cosine_threshold
+        emb_sim = embedding_details.get(idx, {}).get("max_embedding_similarity", None)
+        emb_flag = idx in embedding_violations_by_index
+
+        is_contaminated = max_ngram >= 1.0 or max_cosine >= cosine_threshold or emb_flag
         if is_contaminated:
-            violations.append({
+            violation = {
                 "task_id": task.get("task_id", tf.stem),
                 "partition": task.get("metadata", {}).get("partition", "unknown"),
                 "max_ngram_overlap": round(max_ngram, 4),
-                "max_cosine_similarity": round(max_cosine, 4),
+                "max_cosine_similarity_tfidf": round(max_cosine, 4),
+                "max_embedding_similarity": emb_sim,
                 "worst_ref_index": worst_ref_idx,
                 "flags": {
                     "ngram_exact_match": max_ngram >= 1.0,
-                    "high_cosine": max_cosine >= cosine_threshold,
+                    "high_tfidf_cosine": max_cosine >= cosine_threshold,
+                    "high_embedding_similarity": emb_flag,
                 },
-            })
+            }
+            violations.append(violation)
         else:
             clean += 1
+
+    checks_run = ["ngram_overlap", "tfidf_cosine"]
+    if embedding_model is not None:
+        checks_run.append("embedding_similarity")
 
     return {
         "bench_dir": str(bench_dir),
@@ -196,6 +302,9 @@ def run_check(
         "reference_docs": len(reference_texts),
         "ngram_n": ngram_n,
         "cosine_threshold": cosine_threshold,
+        "embedding_threshold": embedding_threshold if embedding_model is not None else None,
+        "embedding_model": getattr(embedding_model, "_model_card_data", {}).get("model_name", "none") if embedding_model is not None else "none",
+        "checks_run": checks_run,
         "clean": clean,
         "violations": violations,
         "contamination_rate": round(len(violations) / max(len(all_tasks), 1), 4),
@@ -363,6 +472,21 @@ def main():
     parser.add_argument("--ngram", type=int, default=8)
     parser.add_argument("--cosine-threshold", type=float, default=0.85)
     parser.add_argument(
+        "--embedding-model",
+        default=None,
+        help=(
+            "sentence-transformers model name for Check 2b (dense embedding similarity). "
+            "Example: all-MiniLM-L6-v2. Requires: pip install sentence-transformers. "
+            "If omitted, only TF-IDF cosine (Check 2a) is run."
+        ),
+    )
+    parser.add_argument(
+        "--embedding-threshold",
+        type=float,
+        default=0.85,
+        help="Cosine similarity threshold for embedding check (default: 0.85)",
+    )
+    parser.add_argument(
         "--time-shift",
         action="store_true",
         help="Run Check 3: time-shift verification (temporal ordering + jitter audit)",
@@ -417,11 +541,18 @@ def main():
     reference_texts = load_reference_texts(args.reference_file)
     print(f"Loaded {len(reference_texts)} reference documents from {args.reference_file}")
 
+    # Load embedding model if requested (Check 2b)
+    embedding_model = None
+    if args.embedding_model:
+        embedding_model = _try_load_embedding_model(args.embedding_model)
+
     result = run_check(
         bench_dir=args.bench_dir,
         reference_texts=reference_texts,
         ngram_n=args.ngram,
         cosine_threshold=args.cosine_threshold,
+        embedding_model=embedding_model,
+        embedding_threshold=args.embedding_threshold,
     )
 
     if args.json:
@@ -433,12 +564,14 @@ def main():
         print(f"  Clean:          {result.get('clean')}")
         print(f"  Violations:     {len(result.get('violations', []))}")
         print(f"  Contam. rate:   {result.get('contamination_rate', 0):.1%}")
+        print(f"  Checks run:     {', '.join(result.get('checks_run', []))}")
         print(f"{'='*60}\n")
 
         if result.get("violations"):
             print("Violations:")
             for v in result["violations"][:10]:
-                print(f"  {v['task_id']} | cosine={v['max_cosine_similarity']:.3f} | "
+                emb = f" emb={v['max_embedding_similarity']:.3f}" if v.get("max_embedding_similarity") is not None else ""
+                print(f"  {v['task_id']} | tfidf={v['max_cosine_similarity_tfidf']:.3f}{emb} | "
                       f"ngram_exact={v['flags']['ngram_exact_match']}")
             if len(result["violations"]) > 10:
                 print(f"  ... and {len(result['violations']) - 10} more")

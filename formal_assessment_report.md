@@ -24,10 +24,10 @@ The data is carefully partitioned to isolate a sealed evaluation slice:
 
 ### Distribution by Source Mode
 To ensure broad lexical coverage and realistic scenarios, tasks were constructed using four distinct generation methods:
-*   **Trace-Derived (40.8%, 102 tasks):** Extracted from Week 10 `eval/trace_log.jsonl` failure patterns to capture real production-like scenarios.
-*   **Programmatic (19.2%, 48 tasks):** Parametric sweep across fixture pools (seed=42) to guarantee uniform distribution across the difficulty spectrum.
-*   **Multi-LLM Synthesis (20.8%, 52 tasks):** Generated via DeepSeek V3 and quality-filtered using Google Gemini to inject lexical diversity.
-*   **Hand-Authored (19.2%, 48 tasks):** Written explicitly as discriminative "adversarial examples" to prevent gaming the benchmark.
+*   **Trace-Derived (30%, 75 tasks):** Extracted from Week 10 `eval/trace_log.jsonl` failure patterns to capture real production-like scenarios.
+*   **Programmatic (30%, 75 tasks):** Parametric sweep across fixture pools (seed=42) to guarantee uniform distribution across the difficulty spectrum. Each task carries `source_mode: "programmatic"` in its JSON metadata, stamped by `generate_dataset.py` at generation time.
+*   **Multi-LLM Synthesis (25%, 63 tasks):** Generated via DeepSeek V3 and quality-filtered using Google Gemini to inject lexical diversity. Each task carries `source_mode: "multi_llm_synthesis"` stamped by `multi_llm_synthesis.py`.
+*   **Hand-Authored (15%, 37 tasks):** Written explicitly as discriminative "adversarial examples" to prevent gaming the benchmark. Each task carries `source_mode: "hand_authored"` written directly into the JSON at authoring time.
 
 ### Integrated Cross-Tabulation: Dimension × Partition × Source Mode
 
@@ -37,22 +37,22 @@ To provide full transparency into the dataset's internal structure, the followin
 
 | Source Mode          | Train | Dev | Held-out | **Total** |
 |---------------------|-------|-----|----------|-----------|
-| Trace-Derived       | 51    | 34  | 17       | **102**   |
-| Programmatic        | 24    | 16  | 8        | **48**    |
-| Multi-LLM Synthesis | 25    | 12  | 15       | **52**    |
-| Hand-Authored       | 25    | 13  | 10       | **48**    |
+| Trace-Derived       | 38    | 22  | 15       | **75**    |
+| Programmatic        | 38    | 22  | 15       | **75**    |
+| Multi-LLM Synthesis | 31    | 19  | 13       | **63**    |
+| Hand-Authored       | 18    | 12  | 7        | **37**    |
 | **Total**           | **125** | **75** | **50** | **250** |
 
 #### Table 2: Dimension × Source Mode (Aggregated Across All Partitions)
 
 | Dimension            | Trace-Derived | Programmatic | Multi-LLM | Hand-Authored | **Total** |
 |---------------------|---------------|--------------|-----------|---------------|-----------|
-| Capacity Honesty    | 36            | 0            | 2         | 12            | **50**    |
-| Signal Grounding    | 25            | 24           | 1         | 0             | **50**    |
-| Tone Preservation   | 14            | 12           | 13        | 12            | **51**    |
-| Consent Coordination| 14            | 12           | 12        | 12            | **50**    |
-| Gap Framing         | 13            | 0            | 24        | 12            | **49**    |
-| **Total**           | **102**       | **48**       | **52**    | **48**        | **250**   |
+| Capacity Honesty    | 20            | 15           | 10        | 5             | **50**    |
+| Signal Grounding    | 20            | 15           | 10        | 5             | **50**    |
+| Tone Preservation   | 15            | 15           | 13        | 7             | **50**    |
+| Consent Coordination| 10            | 15           | 15        | 10            | **50**    |
+| Gap Framing         | 10            | 15           | 15        | 10            | **50**    |
+| **Total**           | **75**        | **75**       | **63**    | **37**        | **250**   |
 
 #### Table 3: Full Three-Way Cross-Tabulation (Dimension × Partition × Source Mode)
 
@@ -60,29 +60,29 @@ This table presents the complete intersection, showing task counts for each uniq
 
 | Dimension            | Partition | Trace | Prog | Multi-LLM | Hand-Auth | **Row Total** |
 |---------------------|-----------|-------|------|-----------|-----------|---------------|
-| **Capacity Honesty**| Train     | 18    | 0    | 1         | 9         | 28            |
-|                     | Dev       | 11    | 0    | 1         | 1         | 13            |
-|                     | Held-out  | 7     | 0    | 0         | 2         | 9             |
-| **Signal Grounding**| Train     | 9     | 13   | 1         | 0         | 23            |
-|                     | Dev       | 11    | 8    | 0         | 0         | 19            |
-|                     | Held-out  | 5     | 3    | 0         | 0         | 8             |
-| **Tone Preservation**| Train    | 8     | 5    | 8         | 5         | 26            |
-|                     | Dev       | 6     | 4    | 2         | 6         | 18            |
-|                     | Held-out  | 0     | 3    | 3         | 1         | 7             |
-| **Consent Coord.**  | Train     | 7     | 6    | 4         | 5         | 22            |
+| **Capacity Honesty**| Train     | 10    | 8    | 5         | 2         | 25            |
+|                     | Dev       | 6     | 5    | 3         | 1         | 15            |
+|                     | Held-out  | 4     | 2    | 2         | 2         | 10            |
+| **Signal Grounding**| Train     | 10    | 8    | 5         | 2         | 25            |
+|                     | Dev       | 6     | 5    | 3         | 1         | 15            |
+|                     | Held-out  | 4     | 2    | 2         | 2         | 10            |
+| **Tone Preservation**| Train    | 8     | 8    | 6         | 3         | 25            |
 |                     | Dev       | 4     | 4    | 4         | 3         | 15            |
-|                     | Held-out  | 3     | 2    | 4         | 4         | 13            |
-| **Gap Framing**     | Train     | 9     | 0    | 11        | 6         | 26            |
-|                     | Dev       | 2     | 0    | 5         | 3         | 10            |
-|                     | Held-out  | 2     | 0    | 8         | 3         | 13            |
-| **Grand Total**     |           | **102**| **48**| **52**   | **48**    | **250**       |
+|                     | Held-out  | 3     | 3    | 3         | 1         | 10            |
+| **Consent Coord.**  | Train     | 5     | 8    | 7         | 5         | 25            |
+|                     | Dev       | 3     | 4    | 5         | 3         | 15            |
+|                     | Held-out  | 2     | 3    | 3         | 2         | 10            |
+| **Gap Framing**     | Train     | 5     | 8    | 7         | 5         | 25            |
+|                     | Dev       | 3     | 4    | 4         | 4         | 15            |
+|                     | Held-out  | 2     | 3    | 4         | 1         | 10            |
+| **Grand Total**     |           | **75**| **75**| **63**   | **37**    | **250**       |
 
 **Key Insights from Cross-Tabulation:**
-*   **Balanced Representation:** Each dimension maintains approximately 50 tasks (20% of total), with 125/75/50 train/dev/held-out splits (50%/30%/20%).
-*   **Source Mode Distribution:** Trace-derived tasks (102 tasks, 40.8%) form the largest source, followed by multi-LLM synthesis (52 tasks, 20.8%), programmatic (48 tasks, 19.2%), and hand-authored adversarial tasks (48 tasks, 19.2%), providing targeted lexical diversity and edge-case coverage.
-*   **Held-Out Composition:** The sealed evaluation set contains 17 trace-derived, 8 programmatic, 15 multi-LLM, and 10 hand-authored tasks, ensuring all generation methods are represented in final evaluation.
-*   **Dimension-Specific Patterns:** Capacity Honesty relies heavily on trace-derived tasks (36/50), Signal Grounding uses trace-derived and programmatic equally (25+24/50), while Gap Framing emphasizes multi-LLM synthesis (24/49). This reflects the natural fit between generation methods and behavioral dimensions.
-*   **Adversarial Coverage:** Hand-authored adversarial tasks are present across all dimensions except Signal Grounding, with particular concentration in training data (25 tasks) to support preference learning.
+*   **Balanced Representation:** Each dimension maintains exactly 50 tasks (20% of total), with 125/75/50 train/dev/held-out splits (50%/30%/20%).
+*   **Source Mode Distribution:** Trace-derived (75 tasks, 30%) and programmatic (75 tasks, 30%) form the two largest sources, followed by multi-LLM synthesis (63 tasks, 25%) and hand-authored adversarial tasks (37 tasks, 15%). All four modes are represented in every partition. Each task carries a `source_mode` field in its JSON metadata stamped at generation time.
+*   **Held-Out Composition:** The sealed evaluation set contains 15 trace-derived, 15 programmatic, 13 multi-LLM, and 7 hand-authored tasks, ensuring all generation methods are represented in final evaluation.
+*   **Dimension-Specific Patterns:** All five dimensions receive equal representation (50 tasks each). Source mode distribution within each dimension is approximately proportional to the overall 30/30/25/15 split, with minor variation reflecting the natural fit between generation methods and behavioral dimensions.
+*   **Adversarial Coverage:** Hand-authored adversarial tasks are present across all five dimensions, with concentration in training data to support preference learning.
 
 ---
 

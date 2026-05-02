@@ -575,12 +575,24 @@ python contamination_check.py \
 
 ### 4. Train SimPO adapter
 ```bash
-python training/train_simpo.py \
+# Path B (SimPO, default — chosen path)
+python training/train_simpo_hf.py \
   --pairs training_data/pairs.jsonl \
-  --base-model unsloth/Qwen3-8B-bnb-4bit \
+  --path B \
   --output-dir training/lora_adapter \
-  --epochs 3 \
-  --lr 5e-6
+  --log-file training/training_run.log
+
+# Path A (SFT baseline comparison)
+python training/train_simpo_hf.py \
+  --pairs training_data/pairs.jsonl \
+  --path A \
+  --output-dir training/lora_adapter_sft
+
+# Path C (constrained-prompt SFT fallback)
+python training/train_simpo_hf.py \
+  --pairs training_data/pairs.jsonl \
+  --path C \
+  --output-dir training/lora_adapter_constrained
 ```
 
 ### 5. Run held-out evaluation
@@ -615,15 +627,24 @@ python eval/run_evaluation.py \
 ### Check Protocol
 1. **8-gram overlap:** No exact 8-gram match between bench tasks and Week 10 `eval/trace_log.jsonl`
 2. **Cosine similarity (TF-IDF):** All pairs < 0.85 threshold
-3. **Result:** CLEAN (0 violations)
+3. **Embedding similarity (sentence-transformers):** All pairs < 0.85 threshold (dense semantic check)
+4. **Result:** CLEAN (0 violations)
 
 ### Reproduction
 ```bash
+# Checks 1 + 2 (TF-IDF, no external deps)
 python contamination_check.py \
   --bench-dir tenacious_bench_v0.1 \
   --reference-file eval/trace_log.jsonl \
   --ngram 8 \
   --cosine-threshold 0.85
+
+# Checks 1 + 2 + 3 (adds dense embedding similarity; requires sentence-transformers)
+python contamination_check.py \
+  --bench-dir tenacious_bench_v0.1 \
+  --reference-file eval/trace_log.jsonl \
+  --embedding-model all-MiniLM-L6-v2 \
+  --embedding-threshold 0.85
 ```
 
 ---

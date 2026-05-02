@@ -67,9 +67,11 @@ Internal R&D budget under the Tenacious AI agent project. No external funding.
 |-------------|-------|--------------|-------------|
 | trace_derived | 75 | 30% | Derived from Week 10 `eval/trace_log.jsonl` patterns |
 | programmatic | 75 | 30% | Parametric sweep across fixture pools (seed=42) |
-| multi_llm_synthesis | 62 | 25% | Generated via OpenRouter cheap-tier models |
-| hand_authored | 38 | 15% | Written by primary author to defeat Week 10 agent |
+| multi_llm_synthesis | 63 | 25% | Generated via OpenRouter cheap-tier models |
+| hand_authored | 37 | 15% | Written by primary author to defeat Week 10 agent |
 | **Total** | **250** | **100%** | |
+
+**Note on source-mode counts:** Each task carries a `source_mode` field in its JSON metadata (one of `trace_derived`, `programmatic`, `multi_llm_synthesis`, `hand_authored`). The counts above reflect the actual `source_mode` values stamped at generation time. The `generate_dataset.py` programmatic sweep stamps `source_mode: "programmatic"` on all sweep-generated tasks; trace-derived, multi-LLM, and hand-authored tasks are stamped by their respective generation scripts (`multi_llm_synthesis.py` stamps `multi_llm_synthesis`; hand-authored tasks are written with `source_mode: "hand_authored"` in the JSON directly).
 
 ### Source Mode Examples
 
