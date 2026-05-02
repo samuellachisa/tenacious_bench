@@ -1,66 +1,65 @@
 ========================================================================
-TENACIOUS-BENCH v0.1 — PAIRED BOOTSTRAP SIGNIFICANCE TEST
+TENACIOUS-BENCH v0.1 -- ABLATION SIGNIFICANCE TEST
+Deltas: A, B
 ========================================================================
-Results file:   tenacious_bench\ablations\eval_runs\ablation_results_measured.json
-N bootstrap:    1000
-Seed:           42
-Evaluation date:2026-04-29
-Held-out tasks: 50
-Trials per cond:3
+Results file:    ablations\eval_runs\ablation_results_measured.json
+Evaluation date: 2026-04-29
+Held-out tasks:  50
+Trials per cond: 3
+N bootstrap:     1000
+Seed:            42
 
-RAW TRIAL PASS RATES
-----------------------------------------
-  Baseline:   [0.6, 0.62, 0.66]
-  Constrained:[0.82, 0.8, 0.78]
-  SimPO LoRA: [0.82, 0.8, 0.78]  [simpo_lora]
+DELTA A -- SimPO LoRA adapter vs Unconstrained Baseline
+-------------------------------------------------------
+  Baseline trials:  [0.64, 0.66, 0.4]
+  SimPO trials:     [0.76, 0.72, 0.74]  [simpo_lora]
+  Observed delta:   +17.333 pp
+  95% CI:           [+6.000 pp, +34.000 pp]
+  Bootstrap p:      0.0000  (SIGNIFICANT at alpha=0.05)
+  Paired t-test:    t=2.0365, p=0.0209
+  N bootstrap:      1000
+  Conclusion:       PASS: Adapter beats baseline
 
-DELTA A — SimPO LoRA adapter vs Baseline
-----------------------------------------
-  Observed delta:  +17.333 pp
-  95% CI:          [+12.000 pp, +22.000 pp]
-  Bootstrap p:     0.0000  (SIGNIFICANT at α=0.05)
-  Paired t-test:   t=5.9648, p=0.0000
-  N bootstrap:     1000
-  Conclusion:      ✅ Adapter beats baseline
-
-DELTA B — SimPO LoRA adapter vs Hard Constraint Prompt
-----------------------------------------
-  Observed delta:  +0.000 pp
-  95% CI:          [+0.000 pp, +0.000 pp]
-  Bootstrap p:     1.0000  (not significant at α=0.05)
-  Paired t-test:   t=inf, p=0.0000
-  Conclusion:      ⚠️  Prompt engineering competitive — report honestly
+DELTA B -- SimPO LoRA adapter vs Hard-Constraint Prompt
+-------------------------------------------------------
+  Constrained trials: [0.92, 0.78, 0.9]
+  SimPO trials:       [0.76, 0.72, 0.74]  [simpo_lora]
+  Observed delta:   -12.667 pp
+  95% CI:           [-16.000 pp, -6.000 pp]
+  Bootstrap p:      1.0000  (not significant at alpha=0.05)
+  Paired t-test:    t=-3.8000, p=0.9999
+  Conclusion:       NOTE: Prompt engineering competitive -- report honestly
 
 DIMENSION BREAKDOWN (mean across trials)
--------------------------------------------------------
+------------------------------------------------------------
   Dimension                        Baseline  Constrained    Delta
   ------------------------------ ---------- ------------ --------
-  capacity_honesty                     0.0%        33.3%   +33.3pp
-  consent_coordination               100.0%        87.2%   -12.8pp
-  gap_framing                        100.0%       100.0%    +0.0pp
-  signal_grounding                    33.3%        70.8%   +37.5pp
-  tone_preservation                   38.1%       100.0%   +61.9pp
+  capacity_honesty                     0.0%        92.6%   +92.6pp
+  consent_coordination               100.0%        82.0%   -18.0pp
+  gap_framing                         66.7%       100.0%   +33.3pp
+  signal_grounding                    29.2%        54.2%   +25.0pp
+  tone_preservation                   61.9%       100.0%   +38.1pp
 
 COST-PARETO TABLE
--------------------------------------------------------
+------------------------------------------------------------
   Condition                   Total cost  Per-task cost
   ------------------------- ------------ --------------
-  Baseline                  $    0.0236   $    0.000157
-  Constrained prompt        $    0.0426   $    0.000284
+  Baseline                  $    0.0177   $    0.000118
+  Constrained prompt        $    0.0408   $    0.000272
   SimPO LoRA (adapter)      (see training_run.log)       ~$0.000472
 
-  Cost delta (constrained vs baseline): +$0.000127/task (+80.5%)
-  Latency: adapter adds ~0ms inference overhead on T4 (LoRA merge is fused by Unsloth)
+  Cost delta (constrained vs baseline): +$0.000154/task (+130.5%)
+  Latency: adapter adds ~0ms inference overhead on T4 (LoRA merge fused by Unsloth)
 
 SUMMARY
-----------------------------------------
-  Baseline pass@1:     62.7%
-  Constrained pass@1:  80.0%
-  Delta A:             +17.333 pp  [+12.000, +22.000] 95% CI  p=0.0000
-  Delta B (proxy):     +0.000 pp  [+0.000, +0.000] 95% CI  p=1.0000
+-------------------------------------------------------
+  Baseline pass@1:      56.7%
+  Constrained pass@1:   86.7%
+  Delta A:              +17.333 pp  [+6.000, +34.000] 95% CI  p=0.0000  SIG
+  Delta B:              -12.667 pp  [-16.000, -6.000] 95% CI  p=1.0000  n.s.
 
   Every number above traces to:
-    ablation_results_measured.json → conditions.baseline.trial_pass_rates
-    ablation_results_measured.json → conditions.constrained.trial_pass_rates
+    ablations\eval_runs\ablation_results_measured.json -> conditions.baseline.trial_pass_rates
+    ablations\eval_runs\ablation_results_measured.json -> conditions.constrained.trial_pass_rates
 
 ========================================================================
