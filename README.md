@@ -312,6 +312,8 @@ if [ $? -eq 0 ]; then echo "Agent passed"; else echo "Agent failed"; fi
 ```
 tenacious_bench/
 ├── README.md                          ← You are here
+├── LICENSE                            ← CC BY 4.0 (dataset) + MIT (code)
+├── REFERENCES.md                      ← Full bibliography for all cited papers
 ├── audit_memo.md                      ← Gap analysis: τ²-Bench vs Tenacious needs
 ├── datasheet.md                       ← Gebru-compliant dataset documentation
 ├── methodology.md                     ← Training path, partitioning, contamination
@@ -685,8 +687,11 @@ We welcome contributions! See `community_engagement.md` for guidelines.
 
 ## 📄 License
 
-**Dataset:** CC BY 4.0  
-**Code:** MIT License
+**Dataset:** [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) — free to use, share, and adapt with attribution  
+**Code:** [MIT License](LICENSE)  
+
+See [LICENSE](LICENSE) for full terms and third-party acknowledgements.  
+See [REFERENCES.md](REFERENCES.md) for full bibliographic details of all cited papers.
 
 ---
 

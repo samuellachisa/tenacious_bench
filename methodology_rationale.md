@@ -140,3 +140,8 @@ The fine-tuned adapter is considered successful if:
 - **Capacity honesty pass@1 ≥ 85%** (dimension-specific target).
 - **No regression** on signal_grounding or tone_preservation (≤ 2pp drop).
 - Loss converges within 3 epochs (no divergence).
+
+---
+
+*Full bibliographic details for Meng et al. (2024), Zhou et al. (2023), Rafailov et al. (2023),
+and all other cited works are in [REFERENCES.md](REFERENCES.md).*

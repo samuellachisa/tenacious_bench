@@ -273,3 +273,7 @@ v0.2 is planned to add multi-LLM-synthesised tasks and trace-derived tasks from 
 
 **If others want to extend / augment / build on / contribute to the dataset, is there a mechanism for them to do so?**
 PRs welcome on the GitHub repository. All contributions must pass the contamination check and achieve ≥ 80% inter-rater agreement on a 10-task sample before merge.
+
+---
+
+*Full bibliographic details for all papers cited in this datasheet are in [REFERENCES.md](REFERENCES.md).*

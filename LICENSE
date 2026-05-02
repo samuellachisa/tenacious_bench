@@ -1,0 +1,96 @@
+Tenacious-Bench v0.1 — Dual License
+=====================================
+
+This repository contains two distinct artifact types governed by separate licenses.
+
+──────────────────────────────────────────────────────────────────────────────
+DATASET LICENSE — Creative Commons Attribution 4.0 International (CC BY 4.0)
+──────────────────────────────────────────────────────────────────────────────
+
+Applies to: all files under tenacious_bench_v0.1/, training_data/, eval/,
+            probes/, examples/, and all *.json task files throughout the repo.
+
+Copyright (c) 2026 Samuel Lachisa / Tenacious Engineering Team
+
+This work is licensed under the Creative Commons Attribution 4.0 International
+License. To view a copy of this license, visit:
+    https://creativecommons.org/licenses/by/4.0/
+
+You are free to:
+  Share  — copy and redistribute the material in any medium or format
+  Adapt  — remix, transform, and build upon the material for any purpose,
+            even commercially
+
+Under the following terms:
+  Attribution — You must give appropriate credit, provide a link to the
+                license, and indicate if changes were made. You may do so
+                in any reasonable manner, but not in any way that suggests
+                the licensor endorses you or your use.
+
+No additional restrictions — You may not apply legal terms or technological
+measures that legally restrict others from doing anything the license permits.
+
+Suggested citation:
+  @dataset{tenacious_bench_v01_2026,
+    title   = {Tenacious-Bench v0.1: A Benchmark for B2B Sales Agent Evaluation},
+    author  = {Lachisa, Samuel},
+    year    = {2026},
+    month   = {April},
+    url     = {https://huggingface.co/datasets/samuellachisa/tenacious-bench},
+    license = {CC BY 4.0}
+  }
+
+──────────────────────────────────────────────────────────────────────────────
+CODE LICENSE — MIT License
+──────────────────────────────────────────────────────────────────────────────
+
+Applies to: all *.py, *.ipynb, *.sh, *.ps1 files and all other source code
+            files not covered by the dataset license above.
+
+Copyright (c) 2026 Samuel Lachisa / Tenacious Engineering Team
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+──────────────────────────────────────────────────────────────────────────────
+THIRD-PARTY ACKNOWLEDGEMENTS
+──────────────────────────────────────────────────────────────────────────────
+
+This project builds on the following open-source frameworks and datasets:
+
+  - TRL (Transformer Reinforcement Learning) — Apache 2.0
+    https://github.com/huggingface/trl
+
+  - PEFT (Parameter-Efficient Fine-Tuning) — Apache 2.0
+    https://github.com/huggingface/peft
+
+  - Unsloth — Apache 2.0
+    https://github.com/unslothai/unsloth
+
+  - sentence-transformers — Apache 2.0
+    https://github.com/UKPLab/sentence-transformers
+
+  - τ²-Bench (tau-bench) — MIT
+    https://github.com/sierra-research/tau-bench
+
+The benchmark design is informed by the following academic works (full
+citations in REFERENCES.md):
+  Gebru et al. (2021), Pushkarna et al. (2022), Meng et al. (2024),
+  Zhou et al. (2023), Rafailov et al. (2023), Gu et al. (2024),
+  Liu et al. (2024), Chen et al. (2025), Li et al. (2025),
+  Park et al. (2024), Bai et al. (2022).

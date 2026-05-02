@@ -36,6 +36,22 @@ Anti-leakage: the judge model must be a different family from the generator.
   - Generators: DeepSeek, Qwen, Llama (cheap-tier via OpenRouter)
   - Judge: Google Gemini (different family, non-OpenAI, non-DeepSeek)
 
+## Judge Tier Separation (Li et al., 2025 anti-leakage policy)
+
+The full pipeline enforces four-tier model-family separation:
+
+  Tier 1 — Generation:    DeepSeek V3 / Qwen 2.5-72B / Llama 3.1-70B
+                          (bulk task synthesis, cheap tier)
+  Tier 2 — Quality filter: Google Gemini 2.0 Flash  ← THIS SCRIPT
+                          (judge_filter.py, orthogonal to all Tier 1 families)
+  Tier 3 — Spot-check:    Claude Haiku / GPT-4.1-mini
+                          (10% sample cross-check, mid tier)
+  Tier 4 — Held-out eval: Google Gemini 2.5 Flash Lite
+                          (scoring_evaluator.py, sealed slice)
+
+Invariant: Tier 1 family ∉ {Tier 2, Tier 3, Tier 4} families.
+The generator never judges its own outputs at any tier.
+
 Usage:
     # Pointwise filter (default)
     python generation_scripts/judge_filter.py \
