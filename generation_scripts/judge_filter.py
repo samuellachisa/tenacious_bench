@@ -32,9 +32,13 @@ Pairwise mode is used to:
   b) Select the better task when deduplicating near-duplicates (cosine >= 0.90).
   c) Validate that hard-authored adversarial tasks are harder than programmatic ones.
 
-Anti-leakage: the judge model must be a different family from the generator.
-  - Generators: DeepSeek, Qwen, Llama (cheap-tier via OpenRouter)
-  - Judge: Google Gemini (different family, non-OpenAI, non-DeepSeek)
+### Calibration (--calibrate)
+Samples N tasks from a previously filtered directory, re-scores them with the
+eval-tier model, and computes agreement with the dev-tier scores stored in task
+metadata. Reports per-criterion score drift and pass/fail flip rate.
+
+Use this after running the dev-tier filter to validate that the cheap dev-tier
+judge is not systematically biased before the held-out evaluation runs.
 
 ## Judge Tier Separation (Li et al., 2025 anti-leakage policy)
 
@@ -42,50 +46,58 @@ The full pipeline enforces four-tier model-family separation:
 
   Tier 1 — Generation:    DeepSeek V3 / Qwen 2.5-72B / Llama 3.1-70B
                           (bulk task synthesis, cheap tier)
-  Tier 2 — Quality filter: Google Gemini 2.0 Flash  ← THIS SCRIPT
-                          (judge_filter.py, orthogonal to all Tier 1 families)
-  Tier 3 — Spot-check:    Claude Haiku / GPT-4.1-mini
-                          (10% sample cross-check, mid tier)
+  Tier 2 — Dev filter:    Google Gemini 2.0 Flash  <- default for --judge-model
+                          (judge_filter.py pointwise/pairwise, orthogonal to Tier 1)
+  Tier 3 — Calibration:   Claude Haiku / GPT-4.1-mini  <- default for --eval-model
+                          (--calibrate spot-check, 10% sample, mid tier)
   Tier 4 — Held-out eval: Google Gemini 2.5 Flash Lite
                           (scoring_evaluator.py, sealed slice)
 
-Invariant: Tier 1 family ∉ {Tier 2, Tier 3, Tier 4} families.
+Invariant: Tier 1 family not in {Tier 2, Tier 3, Tier 4} families.
 The generator never judges its own outputs at any tier.
 
+Model constants are defined below as DEV_JUDGE_MODEL and EVAL_JUDGE_MODEL.
+Pass --judge-model to override the dev-tier model.
+Pass --eval-model to override the eval-tier model used in --calibrate.
+
 Usage:
-    # Pointwise filter (default)
-    python generation_scripts/judge_filter.py \
-        --input-dir tenacious_bench_v0.1/train \
-        --output-dir tenacious_bench_v0.1/train_filtered \
-        --judge-model google/gemini-2.0-flash-exp \
+    # Pointwise filter (default, dev-tier judge)
+    python generation_scripts/judge_filter.py \\
+        --input-dir tenacious_bench_v0.1/train \\
+        --output-dir tenacious_bench_v0.1/train_filtered \\
         --threshold 7
 
+    # Calibration: spot-check 10% of filtered tasks with eval-tier model
+    python generation_scripts/judge_filter.py \\
+        --calibrate \\
+        --input-dir tenacious_bench_v0.1/train_filtered \\
+        --sample-n 25 \\
+        --eval-model anthropic/claude-haiku-20240307
+
     # Pairwise comparison of two specific tasks
-    python generation_scripts/judge_filter.py \
-        --pairwise \
-        --task-a tenacious_bench_v0.1/train/TB-CH-PR-0001.json \
-        --task-b tenacious_bench_v0.1/train/TB-CH-PR-0002.json \
-        --judge-model google/gemini-2.0-flash-exp
+    python generation_scripts/judge_filter.py \\
+        --pairwise \\
+        --task-a tenacious_bench_v0.1/train/TB-CH-PR-0001.json \\
+        --task-b tenacious_bench_v0.1/train/TB-CH-PR-0002.json
 
     # Pairwise tournament over a directory (selects best N tasks)
-    python generation_scripts/judge_filter.py \
-        --pairwise \
-        --input-dir tenacious_bench_v0.1/train \
-        --output-dir tenacious_bench_v0.1/train_filtered \
-        --top-n 50 \
-        --judge-model google/gemini-2.0-flash-exp
+    python generation_scripts/judge_filter.py \\
+        --pairwise \\
+        --input-dir tenacious_bench_v0.1/train \\
+        --output-dir tenacious_bench_v0.1/train_filtered \\
+        --top-n 50
 
     # Dry run (show what would be filtered without moving files)
-    python generation_scripts/judge_filter.py \
-        --input-dir tenacious_bench_v0.1/train \
-        --judge-model google/gemini-2.0-flash-exp \
-        --threshold 7 \
+    python generation_scripts/judge_filter.py \\
+        --input-dir tenacious_bench_v0.1/train \\
+        --threshold 7 \\
         --dry-run
 """
 
 import argparse
 import json
 import os
+import random
 import sys
 import time
 from pathlib import Path
@@ -95,7 +107,17 @@ from typing import Any
 # OpenRouter API client
 # ---------------------------------------------------------------------------
 
-DEFAULT_JUDGE_MODEL = "google/gemini-2.0-flash-exp"
+# Tier 2 — Dev filter: cheap, fast, orthogonal to generation models (DeepSeek/Qwen/Llama).
+# Used for bulk pointwise filtering and pairwise tournaments during dataset authoring.
+DEV_JUDGE_MODEL = "google/gemini-2.0-flash-exp"
+
+# Tier 3 — Calibration / spot-check: mid-tier, different family from Tier 2.
+# Used in --calibrate mode to validate that the dev-tier judge is not systematically
+# biased. Scores ~10% of filtered tasks and computes agreement with stored dev scores.
+EVAL_JUDGE_MODEL = "anthropic/claude-haiku-20240307"
+
+# Backward-compatible alias — used as the default for --judge-model.
+DEFAULT_JUDGE_MODEL = DEV_JUDGE_MODEL
 
 
 def _call_openrouter(
@@ -300,8 +322,15 @@ def filter_tasks(
                 # Copy task to output dir, add judge metadata
                 task["metadata"] = task.get("metadata", {})
                 task["metadata"]["judge_model"] = judge_model
+                task["metadata"]["judge_tier"] = "dev"
                 task["metadata"]["judge_score"] = score
                 task["metadata"]["judge_notes"] = judgment.get("notes", "")
+                task["metadata"]["judge_criteria"] = {
+                    c: judgment.get(c) for c in [
+                        "realism", "difficulty_calibration",
+                        "ground_truth_quality", "dimension_alignment",
+                    ]
+                }
                 output_file = output_dir / task_file.name
                 output_file.write_text(
                     json.dumps(task, indent=2, ensure_ascii=False), encoding="utf-8"
@@ -587,6 +616,260 @@ def compare_two_tasks(
 
 
 # ---------------------------------------------------------------------------
+# Calibration: dev-tier vs eval-tier agreement check
+# ---------------------------------------------------------------------------
+
+CRITERIA = ["realism", "difficulty_calibration", "ground_truth_quality", "dimension_alignment"]
+
+
+def calibrate_with_eval_tier(
+    input_dir: Path,
+    eval_model: str,
+    dev_model: str,
+    sample_n: int,
+    threshold: int,
+    seed: int = 42,
+) -> dict:
+    """
+    Spot-check calibration: compare dev-tier scores (stored in task metadata)
+    against eval-tier scores (computed fresh) on a random sample of tasks.
+
+    This validates that the cheap dev-tier judge (Tier 2) is not systematically
+    biased relative to the mid-tier eval judge (Tier 3) before the held-out
+    evaluation runs.
+
+    Algorithm:
+      1. Load all tasks from input_dir that have metadata.judge_score set
+         (i.e., tasks that have already been through the dev-tier filter).
+      2. Sample min(sample_n, len(tasks)) tasks stratified by dimension.
+      3. Re-score each sampled task with the eval-tier model.
+      4. Compute per-criterion mean absolute error (MAE) between dev and eval scores.
+      5. Compute pass/fail flip rate: fraction of tasks where dev pass != eval pass.
+      6. Flag any criterion where MAE > 0.5 (systematic bias threshold).
+      7. Return a calibration report dict and print a human-readable summary.
+
+    Args:
+        input_dir:   Directory of tasks that have already been dev-tier filtered.
+                     Tasks must have metadata.judge_score and per-criterion scores
+                     stored by filter_tasks() (metadata.judge_criteria).
+        eval_model:  OpenRouter model ID for the eval-tier judge (Tier 3).
+        dev_model:   OpenRouter model ID used for the original dev-tier filter.
+                     Used for documentation only — not called again.
+        sample_n:    Number of tasks to sample. Stratified by dimension.
+        threshold:   Pass threshold (same as used in the original filter run).
+        seed:        Random seed for reproducible sampling.
+
+    Returns a dict with:
+        sampled:          number of tasks actually scored
+        dev_model:        model used for original dev-tier scoring
+        eval_model:       model used for eval-tier re-scoring
+        per_criterion:    dict of criterion -> {mae, dev_mean, eval_mean, bias_flag}
+        overall_mae:      mean MAE across all four criteria
+        flip_rate:        fraction of tasks where pass/fail verdict changed
+        flipped_tasks:    list of task_ids where verdict flipped
+        bias_detected:    True if any criterion MAE > 0.5
+        recommendation:   "PROCEED" or "INVESTIGATE" with explanation
+    """
+    if not input_dir.exists():
+        print(f"ERROR: input directory not found: {input_dir}", file=sys.stderr)
+        sys.exit(1)
+
+    task_files = sorted(input_dir.glob("*.json"))
+    if not task_files:
+        print(f"WARNING: no JSON files found in {input_dir}", file=sys.stderr)
+        return {"sampled": 0, "error": "no tasks found"}
+
+    # Load tasks that have dev-tier scores in metadata
+    scored_tasks = []
+    for tf in task_files:
+        try:
+            task = json.loads(tf.read_text(encoding="utf-8"))
+            meta = task.get("metadata", {})
+            # Accept tasks that have judge_score (set by filter_tasks)
+            if meta.get("judge_score") is not None:
+                scored_tasks.append((tf, task))
+        except json.JSONDecodeError:
+            continue
+
+    if not scored_tasks:
+        print(
+            "WARNING: no tasks with metadata.judge_score found. "
+            "Run pointwise filter first (filter_tasks writes judge_score to metadata).",
+            file=sys.stderr,
+        )
+        return {"sampled": 0, "error": "no scored tasks found"}
+
+    # Stratified sample by dimension
+    by_dim: dict[str, list] = {}
+    for tf, task in scored_tasks:
+        dim = task.get("dimension", "unknown")
+        by_dim.setdefault(dim, []).append((tf, task))
+
+    rng = random.Random(seed)
+    sampled: list[tuple[Path, dict]] = []
+    dims = sorted(by_dim.keys())
+    per_dim_quota = max(1, sample_n // max(len(dims), 1))
+
+    for dim in dims:
+        pool = by_dim[dim]
+        rng.shuffle(pool)
+        sampled.extend(pool[:per_dim_quota])
+
+    # Top up to sample_n if quotas left room
+    remaining = [item for item in scored_tasks if item not in sampled]
+    rng.shuffle(remaining)
+    sampled.extend(remaining[: max(0, sample_n - len(sampled))])
+    sampled = sampled[:sample_n]
+
+    print(f"Calibration: {len(sampled)} tasks sampled from {len(scored_tasks)} scored tasks")
+    print(f"  Dev-tier model:  {dev_model}")
+    print(f"  Eval-tier model: {eval_model}")
+    print(f"  Pass threshold:  {threshold}/10")
+    print()
+
+    # Re-score with eval-tier model
+    dev_scores: list[dict] = []
+    eval_scores: list[dict] = []
+    flipped_tasks: list[str] = []
+    errors = 0
+
+    for i, (tf, task) in enumerate(sampled, 1):
+        task_id = task.get("task_id", tf.stem)
+        meta = task.get("metadata", {})
+        dev_total = meta.get("judge_score", 0)
+
+        # Reconstruct dev per-criterion scores from metadata if available,
+        # otherwise treat the stored total as the only signal.
+        dev_criteria = meta.get("judge_criteria", {})
+
+        print(f"  [{i}/{len(sampled)}] {task_id} (dev={dev_total}/10)...", end=" ")
+
+        eval_judgment = _judge_task(task, eval_model, threshold)
+        if not eval_judgment:
+            print("ERROR (eval judge unavailable)")
+            errors += 1
+            continue
+
+        eval_total = eval_judgment.get("total", 0)
+        eval_pass = eval_judgment.get("pass", eval_total >= threshold)
+        dev_pass = dev_total >= threshold
+
+        flipped = dev_pass != eval_pass
+        if flipped:
+            flipped_tasks.append(task_id)
+            flip_marker = " *** FLIP ***"
+        else:
+            flip_marker = ""
+
+        print(f"eval={eval_total}/10  {'PASS' if eval_pass else 'FAIL'}{flip_marker}")
+
+        dev_scores.append({
+            "task_id": task_id,
+            "total": dev_total,
+            "pass": dev_pass,
+            **{c: dev_criteria.get(c) for c in CRITERIA},
+        })
+        eval_scores.append({
+            "task_id": task_id,
+            "total": eval_total,
+            "pass": eval_pass,
+            **{c: eval_judgment.get(c) for c in CRITERIA},
+        })
+
+    if not eval_scores:
+        return {"sampled": 0, "errors": errors, "error": "all eval judge calls failed"}
+
+    # Compute per-criterion MAE
+    per_criterion: dict[str, dict] = {}
+    for c in CRITERIA:
+        dev_vals = [s[c] for s in dev_scores if s.get(c) is not None]
+        eval_vals = [s[c] for s in eval_scores if s.get(c) is not None]
+        if not dev_vals or not eval_vals:
+            per_criterion[c] = {"mae": None, "dev_mean": None, "eval_mean": None, "bias_flag": False}
+            continue
+        n = min(len(dev_vals), len(eval_vals))
+        mae = sum(abs(d - e) for d, e in zip(dev_vals[:n], eval_vals[:n])) / n
+        dev_mean = sum(dev_vals[:n]) / n
+        eval_mean = sum(eval_vals[:n]) / n
+        bias_flag = mae > 0.5
+        per_criterion[c] = {
+            "mae": round(mae, 3),
+            "dev_mean": round(dev_mean, 3),
+            "eval_mean": round(eval_mean, 3),
+            "bias_flag": bias_flag,
+        }
+
+    # Overall MAE (total score, 0–10)
+    dev_totals = [s["total"] for s in dev_scores]
+    eval_totals = [s["total"] for s in eval_scores]
+    n = min(len(dev_totals), len(eval_totals))
+    overall_mae = sum(abs(d - e) for d, e in zip(dev_totals[:n], eval_totals[:n])) / max(n, 1)
+
+    flip_rate = len(flipped_tasks) / max(len(eval_scores), 1)
+    bias_detected = any(v["bias_flag"] for v in per_criterion.values() if v["mae"] is not None)
+
+    if bias_detected or flip_rate > 0.15:
+        recommendation = (
+            "INVESTIGATE — dev-tier judge shows systematic bias on one or more criteria "
+            f"(MAE > 0.5) or high flip rate ({flip_rate:.1%} > 15%). "
+            "Consider re-running the filter with the eval-tier model or raising the threshold."
+        )
+    else:
+        recommendation = (
+            f"PROCEED — dev-tier judge is well-calibrated (overall MAE={overall_mae:.2f}, "
+            f"flip rate={flip_rate:.1%}). No systematic bias detected."
+        )
+
+    result = {
+        "sampled": len(eval_scores),
+        "errors": errors,
+        "dev_model": dev_model,
+        "eval_model": eval_model,
+        "threshold": threshold,
+        "seed": seed,
+        "per_criterion": per_criterion,
+        "overall_mae": round(overall_mae, 3),
+        "flip_rate": round(flip_rate, 4),
+        "flipped_tasks": flipped_tasks,
+        "bias_detected": bias_detected,
+        "recommendation": recommendation,
+    }
+
+    # Human-readable summary
+    print()
+    print(f"{'='*65}")
+    print("Calibration Report — Dev-tier vs Eval-tier Agreement")
+    print(f"{'='*65}")
+    print(f"  Sampled tasks:   {len(eval_scores)} / {len(scored_tasks)}")
+    print(f"  Dev model:       {dev_model}")
+    print(f"  Eval model:      {eval_model}")
+    print(f"  Overall MAE:     {overall_mae:.2f} (total score, 0–10)")
+    print(f"  Flip rate:       {flip_rate:.1%} ({len(flipped_tasks)} tasks changed verdict)")
+    print()
+    print(f"  {'Criterion':<30} {'Dev mean':>9} {'Eval mean':>10} {'MAE':>6} {'Bias?':>6}")
+    print(f"  {'-'*30} {'-'*9} {'-'*10} {'-'*6} {'-'*6}")
+    for c, v in per_criterion.items():
+        if v["mae"] is None:
+            print(f"  {c:<30} {'N/A':>9} {'N/A':>10} {'N/A':>6} {'N/A':>6}")
+        else:
+            flag = "YES ⚠" if v["bias_flag"] else "no"
+            print(f"  {c:<30} {v['dev_mean']:>9.2f} {v['eval_mean']:>10.2f} "
+                  f"{v['mae']:>6.3f} {flag:>6}")
+    print()
+    if flipped_tasks:
+        print(f"  Flipped tasks ({len(flipped_tasks)}):")
+        for tid in flipped_tasks[:10]:
+            print(f"    {tid}")
+        if len(flipped_tasks) > 10:
+            print(f"    ... and {len(flipped_tasks) - 10} more")
+        print()
+    print(f"  Recommendation: {recommendation}")
+    print(f"{'='*65}")
+
+    return result
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
@@ -600,6 +883,14 @@ def main():
         "--pairwise",
         action="store_true",
         help="Run pairwise comparison mode instead of pointwise filtering",
+    )
+    parser.add_argument(
+        "--calibrate",
+        action="store_true",
+        help=(
+            "Run calibration mode: re-score a sample of dev-tier-filtered tasks "
+            "with the eval-tier model and report agreement / bias."
+        ),
     )
 
     # Pointwise args
@@ -626,11 +917,37 @@ def main():
         help="Number of top tasks to keep in pairwise tournament mode (default: 50)",
     )
 
+    # Calibration-specific args
+    parser.add_argument(
+        "--eval-model",
+        default=EVAL_JUDGE_MODEL,
+        help=(
+            f"Eval-tier model for --calibrate spot-check (default: {EVAL_JUDGE_MODEL}). "
+            "Must be a different family from --judge-model."
+        ),
+    )
+    parser.add_argument(
+        "--sample-n",
+        type=int,
+        default=25,
+        help="Number of tasks to sample in --calibrate mode (default: 25, ~10%% of 250)",
+    )
+    parser.add_argument(
+        "--calibrate-seed",
+        type=int,
+        default=42,
+        help="Random seed for calibration sampling (default: 42)",
+    )
+
     # Shared args
     parser.add_argument(
         "--judge-model",
         default=DEFAULT_JUDGE_MODEL,
-        help=f"OpenRouter model ID for judge (default: {DEFAULT_JUDGE_MODEL})",
+        help=(
+            f"Dev-tier judge model for pointwise/pairwise filtering "
+            f"(default: {DEFAULT_JUDGE_MODEL}). "
+            "Must be a different family from the generation models."
+        ),
     )
     parser.add_argument(
         "--dry-run",
@@ -647,6 +964,33 @@ def main():
     if not os.environ.get("OPENROUTER_API_KEY"):
         print("ERROR: OPENROUTER_API_KEY environment variable not set", file=sys.stderr)
         sys.exit(1)
+
+    # ── Calibration mode ───────────────────────────────────────────────────
+    if args.calibrate:
+        if not args.input_dir:
+            print("ERROR: --input-dir required for --calibrate mode", file=sys.stderr)
+            sys.exit(1)
+
+        if args.judge_model == args.eval_model:
+            print(
+                f"WARNING: --judge-model and --eval-model are the same ({args.judge_model}). "
+                "Calibration requires two different model families to be meaningful.",
+                file=sys.stderr,
+            )
+
+        result = calibrate_with_eval_tier(
+            input_dir=args.input_dir,
+            eval_model=args.eval_model,
+            dev_model=args.judge_model,
+            sample_n=args.sample_n,
+            threshold=args.threshold,
+            seed=args.calibrate_seed,
+        )
+
+        if args.json:
+            print(json.dumps(result, indent=2))
+
+        sys.exit(0 if not result.get("bias_detected") else 1)
 
     # ── Pairwise mode ──────────────────────────────────────────────────────
     if args.pairwise:
@@ -666,7 +1010,7 @@ def main():
             print("DRY RUN: no files will be moved")
 
         print(f"Pairwise tournament mode")
-        print(f"Judge model: {args.judge_model}")
+        print(f"Judge model (Tier 2 — dev): {args.judge_model}")
         print(f"Input: {args.input_dir}")
         print(f"Top-N: {args.top_n}")
         if args.output_dir:
@@ -709,7 +1053,7 @@ def main():
         print("DRY RUN: no files will be moved")
 
     print(f"Pointwise filter mode")
-    print(f"Judge model: {args.judge_model}")
+    print(f"Judge model (Tier 2 — dev): {args.judge_model}")
     print(f"Pass threshold: {args.threshold}/10")
     print(f"Input: {args.input_dir}")
     if args.output_dir:
@@ -733,6 +1077,13 @@ def main():
     print(f"Failed:     {summary['failed']}")
     print(f"Errors:     {summary['errors']}")
     print(f"{'='*60}")
+    print()
+    print(f"Next step: run calibration to validate dev-tier judge quality:")
+    print(f"  python generation_scripts/judge_filter.py \\")
+    print(f"    --calibrate \\")
+    print(f"    --input-dir {args.output_dir or args.input_dir} \\")
+    print(f"    --sample-n {max(10, summary['passed'] // 10)} \\")
+    print(f"    --eval-model {EVAL_JUDGE_MODEL}")
 
     if args.json:
         print()
@@ -743,4 +1094,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

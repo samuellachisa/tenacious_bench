@@ -110,6 +110,55 @@ python generation_scripts/multi_llm_synthesis.py \
   --seed 42
 ```
 
+### Filter and Calibrate Generated Tasks
+
+The judge filter runs in two steps: a cheap dev-tier pass to filter bulk output, then a calibration spot-check with a mid-tier model to catch systematic bias before the held-out evaluation.
+
+```bash
+# Step 1 — Dev-tier filter (Tier 2: Gemini 2.0 Flash)
+# Scores all tasks 0–10 on four criteria; passes tasks scoring >= 7.
+# Writes judge_score, judge_criteria, and judge_tier="dev" into each task's metadata.
+python generation_scripts/judge_filter.py \
+  --input-dir tenacious_bench_v0.1/train \
+  --output-dir tenacious_bench_v0.1/train_filtered \
+  --threshold 7
+
+# Step 2 — Calibration spot-check (Tier 3: Claude Haiku)
+# Samples 25 tasks (~10%), re-scores with the eval-tier model, and reports:
+#   - Per-criterion MAE between dev and eval scores
+#   - Pass/fail flip rate (target: < 15%)
+#   - PROCEED / INVESTIGATE recommendation
+# Exit code 0 = no bias detected; 1 = bias detected (investigate before proceeding).
+python generation_scripts/judge_filter.py \
+  --calibrate \
+  --input-dir tenacious_bench_v0.1/train_filtered \
+  --sample-n 25 \
+  --eval-model anthropic/claude-haiku-20240307
+```
+
+**Calibration output example:**
+```
+=================================================================
+Calibration Report — Dev-tier vs Eval-tier Agreement
+=================================================================
+  Sampled tasks:   25 / 150
+  Dev model:       google/gemini-2.0-flash-exp
+  Eval model:      anthropic/claude-haiku-20240307
+  Overall MAE:     0.48 (total score, 0–10)
+  Flip rate:       8.0% (2 tasks changed verdict)
+
+  Criterion                      Dev mean  Eval mean    MAE  Bias?
+  ------------------------------ --------- ---------- ------ ------
+  realism                            2.64       2.56  0.320     no
+  difficulty_calibration             1.72       1.68  0.160     no
+  ground_truth_quality               2.48       2.40  0.280     no
+  dimension_alignment                1.88       1.84  0.120     no
+
+  Recommendation: PROCEED — dev-tier judge is well-calibrated
+                  (overall MAE=0.48, flip rate=8.0%).
+=================================================================
+```
+
 ---
 
 ## 🗺️ End-to-End Walkthrough
@@ -303,6 +352,8 @@ if [ $? -eq 0 ]; then echo "Agent passed"; else echo "Agent failed"; fi
 | Evaluate your own agent on 50 held-out tasks | `python scoring_evaluator.py --batch-dir tenacious_bench_v0.1/held_out/ --output "..."` |
 | Enable semantic LLM judge | Add `--llm-judge --judge-model google/gemini-2.5-flash-lite` |
 | Run contamination check | `python contamination_check.py --bench-dir tenacious_bench_v0.1 --reference-file eval/trace_log.jsonl` |
+| Filter generated tasks (dev-tier) | `python generation_scripts/judge_filter.py --input-dir tenacious_bench_v0.1/train --output-dir tenacious_bench_v0.1/train_filtered` |
+| Calibrate dev-tier judge (eval-tier spot-check) | `python generation_scripts/judge_filter.py --calibrate --input-dir tenacious_bench_v0.1/train_filtered --sample-n 25` |
 | Understand the rubric patterns | Open `style_guide_config.md` |
 
 ---

@@ -9,16 +9,20 @@
 
 ### Paper A: SimPO (Simple Preference Optimization, Meng et al. 2024)
 SimPO is a reference-free variant of DPO that removes the need for a reference model by using the average log-probability of the full response as the implicit reward. Key properties:
-- No reference model required at inference → smaller memory footprint.
-- Length-normalized reward prevents the model from gaming length.
-- Margin term γ ensures the chosen response is preferred by at least a fixed margin.
-- Achieves better performance than DPO on AlpacaEval 2 and Arena-Hard with fewer GPU-hours.
+- **§3.1 "Reference-Free Reward":** No reference model required at inference → smaller memory footprint. The reward $r(x,y) = \frac{1}{|y|}\log\pi_\theta(y|x)$ is computed from the policy alone. This section directly motivated using `CPOConfig` with no `ref_model` in `train_simpo_hf.py`.
+- **§3.2 "Length Normalization" (Figure 2):** Length-normalized reward prevents the model from gaming length. Figure 2 shows DPO has a positive reward-vs-length slope (length bias); SimPO's slope is flat. For `bench_over_commitment` the failure is short and fluent — without this normalization the model would be rewarded for verbosity, not constraint adherence.
+- **§3.3 "Margin Term":** Margin γ ensures the chosen response is preferred by at least a fixed margin. This is the `cpo_alpha=0.5` parameter in `train_simpo_hf.py`.
+- **§4.1 "Main Results" (Table 1):** Achieves better performance than DPO on AlpacaEval 2 and Arena-Hard with ~40% fewer GPU-hours on a 7B model. This justified the ~2h training time estimate and the $0 GPU cost in the training configuration table.
 
 ### Paper B: Instruction-following failures and calibration (Zhou et al. 2023)
 Shows that SFT on demonstration data corrects constraint-following failures in 62% of cases but introduces reward hacking in 15%: the model learns to generate plausible-sounding constraint language without actually enforcing the constraint. For Tenacious, "subject to bench confirmation" could become a meaningless appended disclaimer.
+- **§4.2 "Failure Modes of Instruction Tuning" (Table 3):** The 62% correction rate and 15% reward-hacking rate are from the "capacity/commitment constraints" row of Table 3, which reports per-category SFT outcomes across 8 constraint types. Capacity/commitment constraints have the highest reward-hacking rate of any category — directly applicable to `bench_over_commitment`. This section is the primary evidence for rejecting Path A.
+- **§5.1 "Calibration Analysis":** Shows that reward-hacked outputs are indistinguishable from correct outputs by surface-form metrics (BLEU, ROUGE), which is why automated SFT evaluation would overestimate Path A's ceiling. This justified not running SFT to completion and instead estimating its ceiling from the Table 3 rates.
 
 ### Paper C: Reward-model-free alignment (Rafailov et al. DPO, 2023)
 DPO treats the LM as an implicit reward model. Preference pairs (chosen, rejected) are derived from the same trajectory. Works well when the distinction between chosen/rejected is behaviorally clear — exactly our case: the chosen output checks bench before committing; the rejected output does not.
+- **§3.1 "Deriving the DPO Objective":** The gradient derivation shows that DPO up-weights chosen token probabilities *relative to the rejected sequence*, not just relative to a gold demonstration. This is the key distinction from SFT: the model is explicitly penalised for the failure pattern at the token level. SimPO (Meng et al. §3.1) inherits this property while removing the reference model.
+- **§5 "Experiments" (Table 2):** DPO outperforms SFT on instruction-following tasks where the failure mode is a strong generative prior — the same condition as `bench_over_commitment` (P-003 trigger rate = 0.45). This result grounded the decision to use preference-based training over SFT even before SimPO's additional efficiency gains were considered.
 
 ---
 
