@@ -36,11 +36,25 @@ Happy to discuss whether any of these dimensions are worth adding to a future τ
 
 ## Submission Status
 
-- [ ] Issue filed on τ²-Bench repo (pending public dataset push)
-- [ ] Link to be added here after filing
+- [x] Dataset published on HuggingFace: https://huggingface.co/datasets/samuellachisa/tenacious-bench
+- [ ] EleutherAI Discord `#community-projects` post (message drafted below — paste and send)
+- [ ] GitHub issue on τ²-Bench repo (pending)
 
-## Alternative Routes (if τ²-Bench repo is not public)
+## EleutherAI Discord Post (ready to send — paste into #community-projects)
 
-1. Post on EleutherAI Discord `#evals` channel with dataset link and gap finding
-2. Submit to LMSYS community board
-3. Open PR on AgentBench with Tenacious-Bench as a new domain contribution
+**Tenacious-Bench v0.1 — B2B sales agent benchmark (250 tasks, CC BY 4.0)**
+
+Built a domain-specific eval benchmark for B2B sales agents covering 5 dimensions τ²-Bench retail misses:
+
+• **Signal grounding** — does the agent hedge low-confidence hiring signals?
+• **Capacity honesty** — does it check staffing inventory before committing?
+• **Tone preservation** — do 5 style markers survive adversarial pushback?
+• **Consent coordination** — does it ask before booking a call?
+• **Gap framing** — competitive gaps as research questions, not accusations?
+
+Key results: SimPO LoRA adapter lifts capacity_honesty 0% → 82% (+82pp, p=0.024). Hybrid scorer (rule-based + LLM judge, zero human in loop), contamination-checked (CLEAN vs eval traces), inter-rater agreement 90% (κ=0.78).
+
+🤗 Dataset (CC BY 4.0): https://huggingface.co/datasets/samuellachisa/tenacious-bench
+💻 Repo: https://github.com/samuellachisa/tenacious-agent
+
+Happy to discuss the gap analysis vs τ²-Bench or the SimPO preference-tuning approach.

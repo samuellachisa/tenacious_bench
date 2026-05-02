@@ -1,3 +1,21 @@
+---
+license: cc-by-4.0
+task_categories:
+  - text-generation
+language:
+  - en
+tags:
+  - benchmark
+  - b2b-sales
+  - evaluation
+  - simpo
+  - lora
+  - preference-learning
+size_categories:
+  - n<1K
+pretty_name: Tenacious-Bench v0.1
+---
+
 # Tenacious-Bench v0.1
 
 **A specialized benchmark for B2B sales agent evaluation**
