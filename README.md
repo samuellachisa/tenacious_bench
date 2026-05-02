@@ -16,9 +16,14 @@ size_categories:
 pretty_name: Tenacious-Bench v0.1
 ---
 
-> **Note:** The YAML block above is a [HuggingFace dataset card](https://huggingface.co/datasets/samuellachisa/tenacious-bench) — it renders as a styled metadata card on HuggingFace. On GitHub it displays as a plain table, which is expected.
-
 # Tenacious-Bench v0.1
+
+[![HuggingFace Dataset](https://img.shields.io/badge/🤗%20dataset-tenacious--bench-blue)](https://huggingface.co/datasets/samuellachisa/tenacious-bench)
+[![HuggingFace Model](https://img.shields.io/badge/🤗%20model-simpo--lora-orange)](https://huggingface.co/samuellachisa/tenacious-bench-simpo-lora)
+[![License: CC BY 4.0](https://img.shields.io/badge/license-CC%20BY%204.0-green)](https://creativecommons.org/licenses/by/4.0/)
+[![Tasks](https://img.shields.io/badge/tasks-250-brightgreen)](tenacious_bench_v0.1/)
+[![Dimensions](https://img.shields.io/badge/dimensions-5-blueviolet)](README.md#-five-dimensions-explained)
+[![Pass@1 (SimPO)](https://img.shields.io/badge/pass%401%20SimPO-74%25-yellow)](ablations/ablation_results.json)
 
 **A specialized benchmark for B2B sales agent evaluation**
 
