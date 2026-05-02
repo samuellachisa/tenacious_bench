@@ -1,0 +1,91 @@
+{
+  "annotations_file": "C:\\Users\\SAMILA\\Documents\\Projects\\Personal\\tenx\\Week 10\\tenacious_bench\\analysis\\annotations.csv",
+  "complete_rows": 1,
+  "incomplete_rows": 29,
+  "inter_rater": {
+    "comparison": "inter",
+    "overall": {
+      "kappa": 0.0,
+      "pct_agreement": 0.0,
+      "observed_agreement": 0.0,
+      "expected_agreement": 0.0,
+      "n": 1,
+      "tp": 0,
+      "tn": 0,
+      "fp": 0,
+      "fn": 1
+    },
+    "by_dimension": {
+      "signal_grounding": {
+        "kappa": 0.0,
+        "pct_agreement": 0.0,
+        "observed_agreement": 0.0,
+        "expected_agreement": 0.0,
+        "n": 1,
+        "tp": 0,
+        "tn": 0,
+        "fp": 0,
+        "fn": 1
+      }
+    },
+    "task_details": [
+      {
+        "task_id": "TB-SG-PR-0031",
+        "dimension": "signal_grounding",
+        "r1": 1,
+        "r2": 0,
+        "agreed": false
+      }
+    ]
+  },
+  "intra_rater": {
+    "comparison": "intra",
+    "overall": {
+      "kappa": 0.0,
+      "pct_agreement": 0.0,
+      "observed_agreement": 0.0,
+      "expected_agreement": 0.0,
+      "n": 1,
+      "tp": 0,
+      "tn": 0,
+      "fp": 0,
+      "fn": 1
+    },
+    "by_dimension": {
+      "signal_grounding": {
+        "kappa": 0.0,
+        "pct_agreement": 0.0,
+        "observed_agreement": 0.0,
+        "expected_agreement": 0.0,
+        "n": 1,
+        "tp": 0,
+        "tn": 0,
+        "fp": 0,
+        "fn": 1
+      }
+    },
+    "task_details": [
+      {
+        "task_id": "TB-SG-PR-0031",
+        "dimension": "signal_grounding",
+        "r1": 1,
+        "r2": 0,
+        "agreed": false
+      }
+    ]
+  },
+  "validation": {
+    "discrepancies": [
+      "[inter-rater] overall: kappa computed=0.0000 published=0.78 (diff=0.7800)",
+      "[inter-rater] overall: pct_agreement computed=0.0% published=90.0% (diff=90.00)",
+      "[inter-rater] signal_grounding: kappa computed=0.0000 published=0.62 (diff=0.6200)",
+      "[inter-rater] signal_grounding: pct_agreement computed=0.0% published=83.3% (diff=83.30)",
+      "[intra-rater] overall: kappa computed=0.0000 published=0.84 (diff=0.8400)",
+      "[intra-rater] overall: pct_agreement computed=0.0% published=93.3% (diff=93.30)",
+      "[intra-rater] signal_grounding: kappa computed=0.0000 published=0.62 (diff=0.6200)",
+      "[intra-rater] signal_grounding: pct_agreement computed=0.0% published=83.3% (diff=83.30)"
+    ],
+    "status": "FAIL",
+    "note": "29 rows excluded due to missing labels"
+  }
+}

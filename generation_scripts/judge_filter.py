@@ -104,6 +104,160 @@ from pathlib import Path
 from typing import Any
 
 # ---------------------------------------------------------------------------
+# Model family registry — anti-leakage enforcement
+# ---------------------------------------------------------------------------
+# Maps OpenRouter model IDs (or prefixes) to a canonical family name.
+# Used by assert_no_family_overlap() to prevent a generator and judge from
+# the same family ever being configured together (Li et al. 2025).
+#
+# Rules for adding entries:
+#   - Use the exact OpenRouter model ID where possible.
+#   - For model families with many variants, map the org-level prefix
+#     (e.g. "deepseek/") so new checkpoints are covered automatically.
+#   - Family names must be lowercase, hyphen-separated strings.
+
+MODEL_FAMILIES: dict[str, str] = {
+    # Tier 1 — Generation models
+    "deepseek/deepseek-chat":                   "deepseek",
+    "deepseek/deepseek-chat-v3-0324":           "deepseek",
+    "deepseek/deepseek-r1":                     "deepseek",
+    "qwen/qwen-2.5-72b-instruct":               "qwen",
+    "qwen/qwen-2.5-7b-instruct":                "qwen",
+    "meta-llama/llama-3.1-70b-instruct":        "meta-llama",
+    "meta-llama/llama-3.1-8b-instruct":         "meta-llama",
+    "meta-llama/llama-3.3-70b-instruct":        "meta-llama",
+    # Tier 2 — Dev judge
+    "google/gemini-2.0-flash-exp":              "google",
+    "google/gemini-2.0-flash-001":              "google",
+    "google/gemini-2.5-flash":                  "google",
+    "google/gemini-2.5-flash-preview-05-20":    "google",
+    "google/gemini-2.5-flash-lite":             "google",
+    "google/gemini-2.5-pro":                    "google",
+    # Tier 3 — Calibration / eval judge
+    "anthropic/claude-haiku-20240307":          "anthropic",
+    "anthropic/claude-3-5-haiku":               "anthropic",
+    "anthropic/claude-3-5-sonnet":              "anthropic",
+    "anthropic/claude-3-7-sonnet":              "anthropic",
+    "openai/gpt-4.1-mini":                      "openai",
+    "openai/gpt-4.1":                           "openai",
+    "openai/gpt-4o":                            "openai",
+    "openai/gpt-4o-mini":                       "openai",
+    # Tier 4 — Held-out eval (scoring_evaluator.py)
+    # Listed here so the check covers cross-script misconfigurations.
+    "google/gemini-2.5-flash-lite-preview-06-17": "google",
+}
+
+# Generation models that must never appear as judge or eval models.
+# Extend this list when new generator checkpoints are added to the pipeline.
+GENERATION_MODELS: list[str] = [
+    "deepseek/deepseek-chat",
+    "deepseek/deepseek-chat-v3-0324",
+    "deepseek/deepseek-r1",
+    "qwen/qwen-2.5-72b-instruct",
+    "qwen/qwen-2.5-7b-instruct",
+    "meta-llama/llama-3.1-70b-instruct",
+    "meta-llama/llama-3.1-8b-instruct",
+    "meta-llama/llama-3.3-70b-instruct",
+]
+
+
+def _get_family(model_id: str) -> str | None:
+    """
+    Return the canonical family name for a model ID, or None if unknown.
+
+    Tries an exact match first, then falls back to a prefix match on the
+    org slug (e.g. "deepseek/" covers all DeepSeek checkpoints).
+    """
+    if model_id in MODEL_FAMILIES:
+        return MODEL_FAMILIES[model_id]
+    # Prefix match: "org/model-name" → check "org/"
+    org_prefix = model_id.split("/")[0] + "/"
+    for key, family in MODEL_FAMILIES.items():
+        if key.startswith(org_prefix):
+            return family
+    return None
+
+
+def assert_no_family_overlap(
+    judge_model: str,
+    eval_model: str | None = None,
+    generation_models: list[str] | None = None,
+) -> None:
+    """
+    Hard check: raise SystemExit(1) if any judge/eval model shares a family
+    with any generation model.
+
+    This enforces the Li et al. (2025) anti-leakage invariant:
+        Tier 1 family ∉ {Tier 2, Tier 3, Tier 4} families.
+
+    Args:
+        judge_model:        The Tier 2 dev-judge model ID (--judge-model).
+        eval_model:         The Tier 3 eval/calibration model ID (--eval-model).
+                            Pass None to skip the eval-model check.
+        generation_models:  List of Tier 1 generator model IDs to check against.
+                            Defaults to GENERATION_MODELS.
+
+    Raises:
+        SystemExit(1) on any family collision, printing a clear error message.
+    """
+    gen_models = generation_models if generation_models is not None else GENERATION_MODELS
+    judge_models_to_check: list[tuple[str, str]] = [("--judge-model (Tier 2)", judge_model)]
+    if eval_model:
+        judge_models_to_check.append(("--eval-model (Tier 3)", eval_model))
+
+    violations: list[str] = []
+
+    for role_label, judge_id in judge_models_to_check:
+        judge_family = _get_family(judge_id)
+        if judge_family is None:
+            # Unknown model — warn but don't block; the registry may be incomplete.
+            print(
+                f"WARNING: {role_label} model '{judge_id}' is not in MODEL_FAMILIES registry. "
+                "Cannot verify family separation. Add it to MODEL_FAMILIES to enable the check.",
+                file=sys.stderr,
+            )
+            continue
+
+        for gen_id in gen_models:
+            gen_family = _get_family(gen_id)
+            if gen_family is None:
+                continue
+            if judge_family == gen_family:
+                violations.append(
+                    f"  VIOLATION: {role_label} '{judge_id}' (family={judge_family}) "
+                    f"shares a family with generator '{gen_id}' (family={gen_family})."
+                )
+
+    # Also check that judge_model and eval_model are not the same family as each other
+    # (Tier 2 and Tier 3 must be independent for calibration to be meaningful).
+    if eval_model:
+        judge_family = _get_family(judge_model)
+        eval_family = _get_family(eval_model)
+        if judge_family and eval_family and judge_family == eval_family:
+            violations.append(
+                f"  VIOLATION: --judge-model '{judge_model}' (family={judge_family}) "
+                f"and --eval-model '{eval_model}' (family={eval_family}) are the same family. "
+                "Calibration requires two independent model families to be meaningful."
+            )
+
+    if violations:
+        print(
+            "\nERROR: Model family separation violated — generator and judge from the same family.\n"
+            "This breaks the anti-leakage invariant (Li et al. 2025).\n",
+            file=sys.stderr,
+        )
+        for v in violations:
+            print(v, file=sys.stderr)
+        print(
+            "\nFix: choose a judge/eval model from a different family than the generation models.\n"
+            "Generation model families in use: "
+            + ", ".join(sorted({_get_family(m) for m in gen_models if _get_family(m)})),
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+
+# ---------------------------------------------------------------------------
 # OpenRouter API client
 # ---------------------------------------------------------------------------
 
@@ -965,6 +1119,14 @@ def main():
         print("ERROR: OPENROUTER_API_KEY environment variable not set", file=sys.stderr)
         sys.exit(1)
 
+    # ── Anti-leakage guard — must run before any API calls ─────────────────
+    # Fails hard if any judge/eval model shares a family with a generation model.
+    # This enforces the Li et al. (2025) invariant: Tier 1 ∉ {Tier 2, Tier 3}.
+    assert_no_family_overlap(
+        judge_model=args.judge_model,
+        eval_model=args.eval_model if args.calibrate else None,
+    )
+
     # ── Calibration mode ───────────────────────────────────────────────────
     if args.calibrate:
         if not args.input_dir:
@@ -974,7 +1136,9 @@ def main():
         if args.judge_model == args.eval_model:
             print(
                 f"WARNING: --judge-model and --eval-model are the same ({args.judge_model}). "
-                "Calibration requires two different model families to be meaningful.",
+                "Calibration requires two different model families to be meaningful. "
+                "(The family-separation check above should have caught this — "
+                "please add both models to MODEL_FAMILIES if they are missing.)",
                 file=sys.stderr,
             )
 
